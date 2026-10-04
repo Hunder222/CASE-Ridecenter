@@ -1,0 +1,748 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:bioc="http://bpmn.io/schema/bpmn/biocolor/1.0" xmlns:color="http://www.omg.org/spec/BPMN/non-normative/color/1.0" id="Definitions_TO_BE_Holdadministration" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.51.1">
+  <bpmn:collaboration id="Collaboration_Holdadministration_TO_BE">
+    <bpmn:participant id="Participant_EleverOgForaeldre" name="Elever &#38; Forældre (Kunde)" />
+    <bpmn:participant id="Participant_Boegegaarden" name="Bøgegårdens Ridecenter (TO-BE Digitaliseret Proces)" processRef="Process_Holdadministration_TO_BE" />
+    <bpmn:participant id="Participant_Kommune" name="Strandby Kommune (Tilsyns- og Bevillingsmyndighed)" />
+    <bpmn:messageFlow id="MsgFlow_Oensker" name="Månedlige hesteønsker indsamles af ridelærer" sourceRef="Participant_EleverOgForaeldre" targetRef="Activity_PROC_01_IndtastOensker" />
+    <bpmn:messageFlow id="MsgFlow_Opslag" name="Realtidsvisning af hestetildeling via stald-tablet / staldskærm" sourceRef="Activity_PROC_06_DigitalPublicering" targetRef="Participant_EleverOgForaeldre" />
+    <bpmn:messageFlow id="MsgFlow_Forklaring" name="Objektiv tildelingsforklaring (Explainable Allocation) ved tvivl" sourceRef="Activity_PROC_05_Gennemsigtighed" targetRef="Participant_EleverOgForaeldre" />
+    <bpmn:messageFlow id="MsgFlow_Opsadling" name="Vejledning til klargøring &#38; opsadling" sourceRef="Activity_PROC_10_Klargoring" targetRef="Participant_EleverOgForaeldre" />
+    <bpmn:messageFlow id="MsgFlow_Undervisning" name="Rideinstruktion og undervisning (45 min)" sourceRef="Activity_PROC_11_Gennemfoerelse" targetRef="Participant_EleverOgForaeldre" />
+    <bpmn:messageFlow id="MsgFlow_KommuneData" name="Automatisk revisionssikkert eksport/tilsynsdata for tilskudsberettiget fremmøde" sourceRef="Activity_GenererKommuneRapport" targetRef="Participant_Kommune" />
+    <bpmn:messageFlow id="MsgFlow_KommuneTilsynKrav" name="Kommune varsler tilsyn / anmoder om tilskudsdokumentation" sourceRef="Participant_Kommune" targetRef="StartEvent_KommuneTilsyn" />
+    <bpmn:group id="Group_Fase1" categoryValueRef="CategoryValue_Fase1" />
+    <bpmn:group id="Group_Fase2" categoryValueRef="CategoryValue_Fase2" />
+    <bpmn:group id="Group_Fase3" categoryValueRef="CategoryValue_Fase3" />
+  </bpmn:collaboration>
+  <bpmn:category id="Category_Fase1">
+    <bpmn:categoryValue id="CategoryValue_Fase1" value="Fase 1: Månedlig kabale (Algoritmisk holdlistegenerering)" />
+  </bpmn:category>
+  <bpmn:category id="Category_Fase2">
+    <bpmn:categoryValue id="CategoryValue_Fase2" value="Fase 2: Rutine før undervisning (Stald-tablet, statusmeldinger &#38; vikaroverlevering)" />
+  </bpmn:category>
+  <bpmn:category id="Category_Fase3">
+    <bpmn:categoryValue id="CategoryValue_Fase3" value="Fase 3: Afvikling af undervisning, fremmøde &#38; ledelsesoverblik" />
+  </bpmn:category>
+  <bpmn:process id="Process_Holdadministration_TO_BE" name="TO-BE Digital Holdadministration og Hestetildeling" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_Boegegaarden">
+      <bpmn:lane id="Lane_Ridelaerer" name="Ridelærer / Vikar (Marie, Camilla, Birgit, Malene + Vikarer)">
+        <bpmn:flowNodeRef>Activity_PROC_01_IndtastOensker</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_PROC_04_AlgoritmiskKabale</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_PROC_05_Gennemsigtighed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_PROC_06_DigitalPublicering</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_PROC_07_DigitalOpgavefordeling</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_Gennemfoert</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_Timer_30MinFoer</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_MergeVikar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_PROC_11_Gennemfoerelse</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_PROC_12_HurtigAfkrydsning</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ElevUdeblevet</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>StartEvent_Maanedsskifte</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Vikarbehov</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_PROC_09_DigitalVikaroverlevering</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Staldhjaelpere" name="Staldhjælpere / Staldelever (2-4 erfarne piger)">
+        <bpmn:flowNodeRef>Activity_HjaelperOpgaver</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_IndberetHelse</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_AkutSygdom</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_PROC_10_Klargoring</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_PROC_08_Erstatningshest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_MergeSygdom</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_LedelseKontor" name="Ledelse &#38; Kontor (Malene, Thomas &#38; Fagsystem)">
+        <bpmn:flowNodeRef>StartEvent_KommuneTilsyn</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_GenererKommuneRapport</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_KommuneSucces</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_AutoFravaersnotifikation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_MaleneVentelisteHurtig</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_VentelisteOpdateret</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:userTask id="Activity_PROC_01_IndtastOensker" name="PROC-01: Indtaste elevønsker direkte i systemet (F1.1) [VA]">
+      <bpmn:categoryValueRef>CategoryValue_Fase1</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_01</bpmn:incoming>
+      <bpmn:outgoing>Flow_02</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DataOutputAssoc_Oensker">
+        <bpmn:targetRef>DataStoreRef_RidecenterDB_F1</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Activity_PROC_04_AlgoritmiskKabale" name="PROC-04: Algoritmisk holdlistegenerering &#38; validering af Hard/Soft Constraints (F1.2, F1.3, F1.4) [VA] ⭐">
+      <bpmn:categoryValueRef>CategoryValue_Fase1</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_02</bpmn:incoming>
+      <bpmn:outgoing>Flow_05</bpmn:outgoing>
+      <bpmn:property id="Property_Kabale" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DataInputAssoc_DB">
+        <bpmn:sourceRef>DataStoreRef_RidecenterDB_F1</bpmn:sourceRef>
+        <bpmn:targetRef>Property_Kabale</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="Activity_PROC_05_Gennemsigtighed" name="PROC-05: Gennemse forslag &#38; godkende holdliste med objektiv begrundelse (F1.4) [VA]">
+      <bpmn:categoryValueRef>CategoryValue_Fase1</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_05</bpmn:incoming>
+      <bpmn:outgoing>Flow_06</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Activity_PROC_06_DigitalPublicering" name="PROC-06: Automatisk publicering af holdlister til stald-tablets (SSoT) (F1.4) [VA] ⭐">
+      <bpmn:categoryValueRef>CategoryValue_Fase1</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_06</bpmn:incoming>
+      <bpmn:outgoing>Flow_07</bpmn:outgoing>
+      <bpmn:property id="Property_PROC06" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DataInputAssoc_PROC06_DB">
+        <bpmn:sourceRef>DataStoreRef_RidecenterDB_F1</bpmn:sourceRef>
+        <bpmn:targetRef>Property_PROC06</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:dataOutputAssociation id="DataOutputAssoc_SSoT">
+        <bpmn:targetRef>DataObjectRef_DigitalHoldliste</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="Activity_PROC_07_DigitalOpgavefordeling" name="PROC-07: Digital opgavefordeling &#38; valg af hjælperhest via stald-tablet [NNVA]">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_08</bpmn:incoming>
+      <bpmn:outgoing>Flow_09</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_01" sourceRef="StartEvent_Maanedsskifte" targetRef="Activity_PROC_01_IndtastOensker">
+      <bpmn:categoryValueRef>CategoryValue_Fase1</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_02" sourceRef="Activity_PROC_01_IndtastOensker" targetRef="Activity_PROC_04_AlgoritmiskKabale">
+      <bpmn:categoryValueRef>CategoryValue_Fase1</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_05" sourceRef="Activity_PROC_04_AlgoritmiskKabale" targetRef="Activity_PROC_05_Gennemsigtighed">
+      <bpmn:categoryValueRef>CategoryValue_Fase1</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_06" sourceRef="Activity_PROC_05_Gennemsigtighed" targetRef="Activity_PROC_06_DigitalPublicering">
+      <bpmn:categoryValueRef>CategoryValue_Fase1</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_07" sourceRef="Activity_PROC_06_DigitalPublicering" targetRef="Event_Timer_30MinFoer" />
+    <bpmn:sequenceFlow id="Flow_08" sourceRef="Event_Timer_30MinFoer" targetRef="Activity_PROC_07_DigitalOpgavefordeling">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_09" sourceRef="Activity_PROC_07_DigitalOpgavefordeling" targetRef="Activity_HjaelperOpgaver">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_12" sourceRef="Gateway_MergeVikar" targetRef="Activity_PROC_10_Klargoring" />
+    <bpmn:sequenceFlow id="Flow_Nej_NormalAfslutning" name="Nej (Normal aktivitet)" sourceRef="Gateway_ElevUdeblevet" targetRef="EndEvent_Gennemfoert">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Ja_Udeblevet" name="Ja (Udeblevet)" sourceRef="Gateway_ElevUdeblevet" targetRef="Activity_AutoFravaersnotifikation">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:dataStoreReference id="DataStoreRef_RidecenterDB_F1" name="Central Ridecenter Database (SSoT)&#10;• Elever &#38; ønsker (F1.1)&#10;• GDPR Tavs viden (F1.2)&#10;• Hestedatabase (F1.3)">
+      <bpmn:categoryValueRef>CategoryValue_Fase1</bpmn:categoryValueRef>
+    </bpmn:dataStoreReference>
+    <bpmn:dataObjectReference id="DataObjectRef_DigitalHoldliste" name="Realtids digital holdliste (Stald-tablet UI)" dataObjectRef="DataObject_DigitalHoldliste">
+      <bpmn:categoryValueRef>CategoryValue_Fase1</bpmn:categoryValueRef>
+    </bpmn:dataObjectReference>
+    <bpmn:dataObject id="DataObject_DigitalHoldliste" />
+    <bpmn:startEvent id="StartEvent_KommuneTilsyn" name="Behov for kommunal tilskudsrapport (Tilsyn / Månedlig indberetning)">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+      <bpmn:outgoing>Flow_StartRapport</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_KommuneTilsyn" />
+    </bpmn:startEvent>
+    <bpmn:userTask id="Activity_GenererKommuneRapport" name="Malene trækker øjeblikkelig revisionssikker tilskudsrapport (1-klik eksport) [VA] ⭐">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_StartRapport</bpmn:incoming>
+      <bpmn:outgoing>Flow_19_KommuneEnd</bpmn:outgoing>
+      <bpmn:property id="Property_KommuneRapport" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DataInputAssoc_Kommune">
+        <bpmn:sourceRef>DataStoreRef_RidecenterDB_F3</bpmn:sourceRef>
+        <bpmn:targetRef>Property_KommuneRapport</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:userTask>
+    <bpmn:endEvent id="EndEvent_KommuneSucces" name="Kommunal compliance sikret (Automatisk revisionsspor)">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_19_KommuneEnd</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_StartRapport" sourceRef="StartEvent_KommuneTilsyn" targetRef="Activity_GenererKommuneRapport">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_19_KommuneEnd" sourceRef="Activity_GenererKommuneRapport" targetRef="EndEvent_KommuneSucces">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:endEvent id="EndEvent_Gennemfoert" name="Undervisning gennemført &#38; 100% digitalt dokumenteret">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_Nej_NormalAfslutning</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:userTask id="Activity_HjaelperOpgaver" name="Muge, fodre, hente heste ind jf. tablet-oversigt [NNVA]">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_09</bpmn:incoming>
+      <bpmn:outgoing>Flow_09_Helse</bpmn:outgoing>
+      <bpmn:property id="Property_HjaelperOpgaver" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DataInputAssoc_Hjaelpere_Holdliste">
+        <bpmn:sourceRef>DataObjectRef_DigitalHoldliste</bpmn:sourceRef>
+        <bpmn:targetRef>Property_HjaelperOpgaver</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:userTask>
+    <bpmn:userTask id="Activity_IndberetHelse" name="Indberette hestehelbred / adfærdsstatus på tablet (F2.1) [NNVA] ⭐">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_09_Helse</bpmn:incoming>
+      <bpmn:outgoing>Flow_10</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DataOutputAssoc_Helse">
+        <bpmn:targetRef>DataStoreRef_RidecenterDB_F2</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gateway_AkutSygdom" name="Er hest meldt syg / halt eller elev afbud?">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_Ja_Sygdom</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Nej_RaskeHeste</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_09_Helse" sourceRef="Activity_HjaelperOpgaver" targetRef="Activity_IndberetHelse">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_10" sourceRef="Activity_IndberetHelse" targetRef="Gateway_AkutSygdom">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Ja_Sygdom" name="Ja (Halt / Afbud)" sourceRef="Gateway_AkutSygdom" targetRef="Activity_PROC_08_Erstatningshest">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Nej_RaskeHeste" name="Nej (Alt OK)" sourceRef="Gateway_AkutSygdom" targetRef="Gateway_MergeSygdom">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:serviceTask id="Activity_AutoFravaersnotifikation" name="System registrerer fravær &#38; flager automatisk på Malenes dashboard [VA] ⭐">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_Ja_Udeblevet</bpmn:incoming>
+      <bpmn:outgoing>Flow_FravaerTilMalene</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="Activity_MaleneVentelisteHurtig" name="Malene følger op på elev/venteliste via Web-Admin Dashboard [VA]">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_FravaerTilMalene</bpmn:incoming>
+      <bpmn:outgoing>Flow_VentelisteAfsluttet</bpmn:outgoing>
+      <bpmn:property id="Property_15ogqb2" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DataInputAssociation_1w1ozuk">
+        <bpmn:sourceRef>DataStoreRef_RidecenterDB_F3</bpmn:sourceRef>
+        <bpmn:targetRef>Property_15ogqb2</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:userTask>
+    <bpmn:endEvent id="EndEvent_VentelisteOpdateret" name="Elevstatus/venteliste ajourført digitalt af Malene">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_VentelisteAfsluttet</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_FravaerTilMalene" sourceRef="Activity_AutoFravaersnotifikation" targetRef="Activity_MaleneVentelisteHurtig">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_VentelisteAfsluttet" sourceRef="Activity_MaleneVentelisteHurtig" targetRef="EndEvent_VentelisteOpdateret">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:intermediateCatchEvent id="Event_Timer_30MinFoer" name="Ridedag: 30 min. før holdstart">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_07</bpmn:incoming>
+      <bpmn:outgoing>Flow_08</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_Ridedag" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:exclusiveGateway id="Gateway_MergeVikar">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_Nej_FastLaerer</bpmn:incoming>
+      <bpmn:incoming>Flow_VikarKlar</bpmn:incoming>
+      <bpmn:outgoing>Flow_12</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_Nej_FastLaerer" name="Nej (Fast lærer)" sourceRef="Gateway_Vikarbehov" targetRef="Gateway_MergeVikar">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_VikarKlar" name="Cheat sheet åbnet (0 sek forsinkelse)" sourceRef="Activity_PROC_09_DigitalVikaroverlevering" targetRef="Gateway_MergeVikar">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:userTask id="Activity_PROC_11_Gennemfoerelse" name="PROC-11: Gennemførelse af rideundervisning (45 min) [VA]">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_13</bpmn:incoming>
+      <bpmn:outgoing>Flow_14</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:userTask id="Activity_PROC_12_HurtigAfkrydsning" name="PROC-12: Digital afkrydsning på stald-tablet (&#60;15 sek, offline-first) (F3.1) [VA] ⭐">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_14</bpmn:incoming>
+      <bpmn:outgoing>Flow_17</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="DataOutputAssoc_Fremmoede">
+        <bpmn:targetRef>DataStoreRef_RidecenterDB_F3</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gateway_ElevUdeblevet" name="Er elev udeblevet gentagne gange?">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_17</bpmn:incoming>
+      <bpmn:outgoing>Flow_Nej_NormalAfslutning</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Ja_Udeblevet</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:userTask id="Activity_PROC_10_Klargoring" name="PROC-10: Klargøring &#38; opsadling af heste i stalden jf. opdateret skærm [VA]">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_12</bpmn:incoming>
+      <bpmn:outgoing>Flow_13</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_13" sourceRef="Activity_PROC_10_Klargoring" targetRef="Activity_PROC_11_Gennemfoerelse">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_14" sourceRef="Activity_PROC_11_Gennemfoerelse" targetRef="Activity_PROC_12_HurtigAfkrydsning">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_17" sourceRef="Activity_PROC_12_HurtigAfkrydsning" targetRef="Gateway_ElevUdeblevet">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:dataStoreReference id="DataStoreRef_RidecenterDB_F3" name="Central Ridecenter Database (SSoT)&#10;• Revisionssikret fremmøde (F3.1)&#10;• Ledelsesdashboard &#38; kommunal data">
+      <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
+    </bpmn:dataStoreReference>
+    <bpmn:startEvent id="StartEvent_Maanedsskifte" name="Månedsskifte (Sidste lektion i måneden)">
+      <bpmn:categoryValueRef>CategoryValue_Fase1</bpmn:categoryValueRef>
+      <bpmn:outgoing>Flow_01</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_Start" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Activity_PROC_08_Erstatningshest" name="PROC-08: Algoritmen foreslår 3-trins godkendte erstatningsheste på &#60;2 sek. (F2.2) [VA] ⭐">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_Ja_Sygdom</bpmn:incoming>
+      <bpmn:outgoing>Flow_ErstatningFundet</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="Flow_ErstatningFundet" name="1-klik erstatning godkendt" sourceRef="Activity_PROC_08_Erstatningshest" targetRef="Gateway_MergeSygdom">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:exclusiveGateway id="Gateway_MergeSygdom">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_Nej_RaskeHeste</bpmn:incoming>
+      <bpmn:incoming>Flow_ErstatningFundet</bpmn:incoming>
+      <bpmn:outgoing>Flow_11</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="Gateway_Vikarbehov" name="Fast ridelærer forhindret (syg/stævne)?">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_11</bpmn:incoming>
+      <bpmn:outgoing>Flow_Ja_Vikar</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Nej_FastLaerer</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_11" sourceRef="Gateway_MergeSygdom" targetRef="Gateway_Vikarbehov">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Ja_Vikar" name="Ja (Vikar)" sourceRef="Gateway_Vikarbehov" targetRef="Activity_PROC_09_DigitalVikaroverlevering">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+    </bpmn:sequenceFlow>
+    <bpmn:dataStoreReference id="DataStoreRef_RidecenterDB_F2" name="Central Ridecenter Database (SSoT)&#10;• Helbred/adfærd (F2.1)&#10;• Heste-match/kabale (F2.2)&#10;• Cheat sheet vikar (F2.3)">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+    </bpmn:dataStoreReference>
+    <bpmn:serviceTask id="Activity_PROC_09_DigitalVikaroverlevering" name="PROC-09: Vikar logger ind og tilgår &#39;Holdets Cheat Sheet&#39; med sikkerhedsnoter (F2.3) [VA] ⭐">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+      <bpmn:incoming>Flow_Ja_Vikar</bpmn:incoming>
+      <bpmn:outgoing>Flow_VikarKlar</bpmn:outgoing>
+      <bpmn:property id="Property_CheatSheet" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DataInputAssoc_CheatSheet">
+        <bpmn:sourceRef>DataStoreRef_RidecenterDB_F2</bpmn:sourceRef>
+        <bpmn:targetRef>Property_CheatSheet</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:serviceTask>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_TO_BE">
+    <bpmndi:BPMNPlane id="BPMNPlane_TO_BE" bpmnElement="Collaboration_Holdadministration_TO_BE">
+      <bpmndi:BPMNShape id="Participant_EleverOgForaeldre_di" bpmnElement="Participant_EleverOgForaeldre" isHorizontal="true" bioc:stroke="#0d6efd" bioc:fill="#cfe2ff" color:background-color="#cfe2ff" color:border-color="#0d6efd">
+        <dc:Bounds x="156" y="140" width="3644" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Participant_Boegegaarden_di" bpmnElement="Participant_Boegegaarden" isHorizontal="true">
+        <dc:Bounds x="156" y="380" width="3644" height="670" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_LedelseKontor_di" bpmnElement="Lane_LedelseKontor" isHorizontal="true">
+        <dc:Bounds x="186" y="820" width="3614" height="230" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Staldhjaelpere_di" bpmnElement="Lane_Staldhjaelpere" isHorizontal="true">
+        <dc:Bounds x="186" y="650" width="3614" height="170" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Ridelaerer_di" bpmnElement="Lane_Ridelaerer" isHorizontal="true">
+        <dc:Bounds x="186" y="380" width="3614" height="270" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_PROC_01_IndtastOensker_di" bpmnElement="Activity_PROC_01_IndtastOensker" bioc:stroke="#28a745" bioc:fill="#d4edda" color:background-color="#d4edda" color:border-color="#28a745">
+        <dc:Bounds x="330" y="420" width="160" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_PROC_04_AlgoritmiskKabale_di" bpmnElement="Activity_PROC_04_AlgoritmiskKabale" bioc:stroke="#28a745" bioc:fill="#d4edda" color:background-color="#d4edda" color:border-color="#28a745">
+        <dc:Bounds x="560" y="420" width="180" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_PROC_05_Gennemsigtighed_di" bpmnElement="Activity_PROC_05_Gennemsigtighed" bioc:stroke="#28a745" bioc:fill="#d4edda" color:background-color="#d4edda" color:border-color="#28a745">
+        <dc:Bounds x="800" y="420" width="170" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_PROC_06_DigitalPublicering_di" bpmnElement="Activity_PROC_06_DigitalPublicering" bioc:stroke="#28a745" bioc:fill="#d4edda" color:background-color="#d4edda" color:border-color="#28a745">
+        <dc:Bounds x="1030" y="420" width="170" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_PROC_07_DigitalOpgavefordeling_di" bpmnElement="Activity_PROC_07_DigitalOpgavefordeling" bioc:stroke="#28a745" bioc:fill="#d4edda" color:background-color="#d4edda" color:border-color="#28a745">
+        <dc:Bounds x="1360" y="420" width="160" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataStoreRef_RidecenterDB_F1_di" bpmnElement="DataStoreRef_RidecenterDB_F1" bioc:stroke="#0d6efd" bioc:fill="#cfe2ff" color:background-color="#cfe2ff" color:border-color="#0d6efd">
+        <dc:Bounds x="620" y="905" width="60" height="60" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="560" y="972" width="180" height="53" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectRef_DigitalHoldliste_di" bpmnElement="DataObjectRef_DigitalHoldliste" bioc:stroke="#28a745" bioc:fill="#d4edda" color:background-color="#d4edda" color:border-color="#28a745">
+        <dc:Bounds x="1097" y="545" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1076" y="602" width="79" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_KommuneTilsyn_di" bpmnElement="StartEvent_KommuneTilsyn" bioc:stroke="#6f42c1" bioc:fill="#e2d9f3" color:background-color="#e2d9f3" color:border-color="#6f42c1">
+        <dc:Bounds x="3352" y="984" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3250" y="975" width="101" height="53" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_GenererKommuneRapport_di" bpmnElement="Activity_GenererKommuneRapport" bioc:stroke="#0d6efd" bioc:fill="#cfe2ff" color:background-color="#cfe2ff" color:border-color="#0d6efd">
+        <dc:Bounds x="3440" y="962" width="150" height="75" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_KommuneSucces_di" bpmnElement="EndEvent_KommuneSucces">
+        <dc:Bounds x="3632" y="982" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3678" y="979" width="112" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_Gennemfoert_di" bpmnElement="EndEvent_Gennemfoert">
+        <dc:Bounds x="3632" y="447" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3676" y="443" width="68" height="53" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_HjaelperOpgaver_di" bpmnElement="Activity_HjaelperOpgaver" bioc:stroke="#ffc107" bioc:fill="#fff3cd" color:background-color="#fff3cd" color:border-color="#ffc107">
+        <dc:Bounds x="1360" y="685" width="160" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_IndberetHelse_di" bpmnElement="Activity_IndberetHelse" bioc:stroke="#28a745" bioc:fill="#d4edda" color:background-color="#d4edda" color:border-color="#28a745">
+        <dc:Bounds x="1570" y="685" width="160" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_AkutSygdom_di" bpmnElement="Gateway_AkutSygdom" isMarkerVisible="true">
+        <dc:Bounds x="1780" y="705" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1763" y="660" width="85" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_AutoFravaersnotifikation_di" bpmnElement="Activity_AutoFravaersnotifikation" bioc:stroke="#0d6efd" bioc:fill="#cfe2ff" color:background-color="#cfe2ff" color:border-color="#0d6efd">
+        <dc:Bounds x="3250" y="835" width="150" height="85" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_MaleneVentelisteHurtig_di" bpmnElement="Activity_MaleneVentelisteHurtig" bioc:stroke="#0d6efd" bioc:fill="#cfe2ff" color:background-color="#cfe2ff" color:border-color="#0d6efd">
+        <dc:Bounds x="3440" y="835" width="150" height="85" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_VentelisteOpdateret_di" bpmnElement="EndEvent_VentelisteOpdateret">
+        <dc:Bounds x="3632" y="860" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3678" y="860" width="101" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_Timer_30MinFoer_di" bpmnElement="Event_Timer_30MinFoer">
+        <dc:Bounds x="1282" y="447" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1258" y="490" width="84" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_MergeVikar_di" bpmnElement="Gateway_MergeVikar" isMarkerVisible="true">
+        <dc:Bounds x="2420" y="530" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_PROC_11_Gennemfoerelse_di" bpmnElement="Activity_PROC_11_Gennemfoerelse" bioc:stroke="#28a745" bioc:fill="#d4edda" color:background-color="#d4edda" color:border-color="#28a745">
+        <dc:Bounds x="2750" y="420" width="160" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_PROC_12_HurtigAfkrydsning_di" bpmnElement="Activity_PROC_12_HurtigAfkrydsning" bioc:stroke="#28a745" bioc:fill="#d4edda" color:background-color="#d4edda" color:border-color="#28a745">
+        <dc:Bounds x="2960" y="420" width="170" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_ElevUdeblevet_di" bpmnElement="Gateway_ElevUdeblevet" isMarkerVisible="true">
+        <dc:Bounds x="3190" y="440" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3172" y="403" width="86" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_PROC_10_Klargoring_di" bpmnElement="Activity_PROC_10_Klargoring" bioc:stroke="#28a745" bioc:fill="#d4edda" color:background-color="#d4edda" color:border-color="#28a745">
+        <dc:Bounds x="2550" y="685" width="160" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataStoreRef_RidecenterDB_F3_di" bpmnElement="DataStoreRef_RidecenterDB_F3" bioc:stroke="#0d6efd" bioc:fill="#cfe2ff" color:background-color="#cfe2ff" color:border-color="#0d6efd">
+        <dc:Bounds x="3015" y="905" width="60" height="60" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2955" y="972" width="180" height="53" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_Maanedsskifte_di" bpmnElement="StartEvent_Maanedsskifte">
+        <dc:Bounds x="255" y="447" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="236" y="490" width="75" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_PROC_08_Erstatningshest_di" bpmnElement="Activity_PROC_08_Erstatningshest" bioc:stroke="#28a745" bioc:fill="#d4edda" color:background-color="#d4edda" color:border-color="#28a745">
+        <dc:Bounds x="1910" y="685" width="170" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_MergeSygdom_di" bpmnElement="Gateway_MergeSygdom" isMarkerVisible="true">
+        <dc:Bounds x="2160" y="705" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Vikarbehov_di" bpmnElement="Gateway_Vikarbehov" isMarkerVisible="true">
+        <dc:Bounds x="2160" y="530" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2085" y="535" width="70" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataStoreRef_RidecenterDB_F2_di" bpmnElement="DataStoreRef_RidecenterDB_F2" bioc:stroke="#0d6efd" bioc:fill="#cfe2ff" color:background-color="#cfe2ff" color:border-color="#0d6efd">
+        <dc:Bounds x="1960" y="905" width="60" height="60" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1900" y="972" width="180" height="53" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_PROC_09_DigitalVikaroverlevering_di" bpmnElement="Activity_PROC_09_DigitalVikaroverlevering" bioc:stroke="#28a745" bioc:fill="#d4edda" color:background-color="#d4edda" color:border-color="#28a745">
+        <dc:Bounds x="2220" y="420" width="170" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_01_di" bpmnElement="Flow_01">
+        <di:waypoint x="291" y="465" />
+        <di:waypoint x="330" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_02_di" bpmnElement="Flow_02">
+        <di:waypoint x="490" y="465" />
+        <di:waypoint x="560" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_05_di" bpmnElement="Flow_05">
+        <di:waypoint x="740" y="465" />
+        <di:waypoint x="800" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_06_di" bpmnElement="Flow_06">
+        <di:waypoint x="970" y="465" />
+        <di:waypoint x="1030" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_07_di" bpmnElement="Flow_07">
+        <di:waypoint x="1200" y="465" />
+        <di:waypoint x="1282" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_08_di" bpmnElement="Flow_08">
+        <di:waypoint x="1318" y="465" />
+        <di:waypoint x="1360" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_09_di" bpmnElement="Flow_09">
+        <di:waypoint x="1440" y="510" />
+        <di:waypoint x="1440" y="685" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_12_di" bpmnElement="Flow_12">
+        <di:waypoint x="2470" y="555" />
+        <di:waypoint x="2520" y="555" />
+        <di:waypoint x="2520" y="730" />
+        <di:waypoint x="2550" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Nej_NormalAfslutning_di" bpmnElement="Flow_Nej_NormalAfslutning">
+        <di:waypoint x="3240" y="465" />
+        <di:waypoint x="3632" y="465" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3411" y="441" width="59" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Ja_Udeblevet_di" bpmnElement="Flow_Ja_Udeblevet">
+        <di:waypoint x="3215" y="490" />
+        <di:waypoint x="3215" y="878" />
+        <di:waypoint x="3250" y="878" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3224" y="541" width="72" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_StartRapport_di" bpmnElement="Flow_StartRapport">
+        <di:waypoint x="3388" y="1002" />
+        <di:waypoint x="3440" y="1002" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_19_KommuneEnd_di" bpmnElement="Flow_19_KommuneEnd">
+        <di:waypoint x="3590" y="1000" />
+        <di:waypoint x="3632" y="1000" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_09_Helse_di" bpmnElement="Flow_09_Helse">
+        <di:waypoint x="1520" y="730" />
+        <di:waypoint x="1570" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_10_di" bpmnElement="Flow_10">
+        <di:waypoint x="1730" y="730" />
+        <di:waypoint x="1780" y="730" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Ja_Sygdom_di" bpmnElement="Flow_Ja_Sygdom">
+        <di:waypoint x="1830" y="730" />
+        <di:waypoint x="1910" y="730" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1842" y="701" width="56" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Nej_RaskeHeste_di" bpmnElement="Flow_Nej_RaskeHeste">
+        <di:waypoint x="1805" y="755" />
+        <di:waypoint x="1805" y="795" />
+        <di:waypoint x="2185" y="795" />
+        <di:waypoint x="2185" y="755" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1960" y="801" width="59" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FravaerTilMalene_di" bpmnElement="Flow_FravaerTilMalene">
+        <di:waypoint x="3400" y="878" />
+        <di:waypoint x="3440" y="878" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_VentelisteAfsluttet_di" bpmnElement="Flow_VentelisteAfsluttet">
+        <di:waypoint x="3590" y="878" />
+        <di:waypoint x="3632" y="878" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Nej_FastLaerer_di" bpmnElement="Flow_Nej_FastLaerer">
+        <di:waypoint x="2210" y="555" />
+        <di:waypoint x="2420" y="555" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2221" y="561" width="78" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_VikarKlar_di" bpmnElement="Flow_VikarKlar">
+        <di:waypoint x="2390" y="465" />
+        <di:waypoint x="2445" y="465" />
+        <di:waypoint x="2445" y="530" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2398" y="436" width="90" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_13_di" bpmnElement="Flow_13">
+        <di:waypoint x="2710" y="730" />
+        <di:waypoint x="2730" y="730" />
+        <di:waypoint x="2730" y="465" />
+        <di:waypoint x="2750" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_14_di" bpmnElement="Flow_14">
+        <di:waypoint x="2910" y="465" />
+        <di:waypoint x="2960" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_17_di" bpmnElement="Flow_17">
+        <di:waypoint x="3130" y="465" />
+        <di:waypoint x="3190" y="465" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ErstatningFundet_di" bpmnElement="Flow_ErstatningFundet">
+        <di:waypoint x="2080" y="730" />
+        <di:waypoint x="2160" y="730" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2081" y="691" width="78" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_11_di" bpmnElement="Flow_11">
+        <di:waypoint x="2185" y="705" />
+        <di:waypoint x="2185" y="580" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Ja_Vikar_di" bpmnElement="Flow_Ja_Vikar">
+        <di:waypoint x="2185" y="530" />
+        <di:waypoint x="2185" y="465" />
+        <di:waypoint x="2220" y="465" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2136" y="463" width="47" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="Participant_Kommune_di" bpmnElement="Participant_Kommune" isHorizontal="true" bioc:stroke="#6f42c1" bioc:fill="#e2d9f3" color:background-color="#e2d9f3" color:border-color="#6f42c1">
+        <dc:Bounds x="156" y="1220" width="3644" height="90" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Group_Fase1_di" bpmnElement="Group_Fase1">
+        <dc:Bounds x="220" y="370" width="1010" height="690" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="683" y="1066" width="158" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Group_Fase2_di" bpmnElement="Group_Fase2">
+        <dc:Bounds x="1240" y="370" width="1260" height="690" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1763" y="1066" width="154" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Group_Fase3_di" bpmnElement="Group_Fase3">
+        <dc:Bounds x="2510" y="370" width="1300" height="690" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3084" y="1066" width="129" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="DataOutputAssoc_Oensker_di" bpmnElement="DataOutputAssoc_Oensker">
+        <di:waypoint x="410" y="510" />
+        <di:waypoint x="410" y="935" />
+        <di:waypoint x="620" y="935" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataInputAssoc_DB_di" bpmnElement="DataInputAssoc_DB">
+        <di:waypoint x="650" y="905" />
+        <di:waypoint x="650" y="510" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataInputAssoc_PROC06_DB_di" bpmnElement="DataInputAssoc_PROC06_DB">
+        <di:waypoint x="680" y="935" />
+        <di:waypoint x="1060" y="935" />
+        <di:waypoint x="1060" y="510" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataOutputAssoc_SSoT_di" bpmnElement="DataOutputAssoc_SSoT">
+        <di:waypoint x="1115" y="510" />
+        <di:waypoint x="1115" y="545" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataInputAssoc_Kommune_di" bpmnElement="DataInputAssoc_Kommune">
+        <di:waypoint x="3075" y="945" />
+        <di:waypoint x="3410" y="945" />
+        <di:waypoint x="3440" y="960" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataInputAssoc_Hjaelpere_Holdliste_di" bpmnElement="DataInputAssoc_Hjaelpere_Holdliste">
+        <di:waypoint x="1133" y="575" />
+        <di:waypoint x="1390" y="575" />
+        <di:waypoint x="1390" y="685" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataOutputAssoc_Helse_di" bpmnElement="DataOutputAssoc_Helse">
+        <di:waypoint x="1650" y="775" />
+        <di:waypoint x="1650" y="935" />
+        <di:waypoint x="1960" y="935" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataInputAssociation_1w1ozuk_di" bpmnElement="DataInputAssociation_1w1ozuk">
+        <di:waypoint x="3075" y="935" />
+        <di:waypoint x="3410" y="935" />
+        <di:waypoint x="3440" y="920" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataOutputAssoc_Fremmoede_di" bpmnElement="DataOutputAssoc_Fremmoede">
+        <di:waypoint x="3045" y="510" />
+        <di:waypoint x="3045" y="905" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="DataInputAssoc_CheatSheet_di" bpmnElement="DataInputAssoc_CheatSheet">
+        <di:waypoint x="2020" y="935" />
+        <di:waypoint x="2305" y="935" />
+        <di:waypoint x="2305" y="510" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Oensker_di" bpmnElement="MsgFlow_Oensker">
+        <di:waypoint x="410" y="230" />
+        <di:waypoint x="410" y="420" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="336" y="254" width="62" height="53" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Opslag_di" bpmnElement="MsgFlow_Opslag">
+        <di:waypoint x="1115" y="420" />
+        <di:waypoint x="1115" y="230" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1126" y="246" width="112" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Forklaring_di" bpmnElement="MsgFlow_Forklaring">
+        <di:waypoint x="885" y="420" />
+        <di:waypoint x="885" y="230" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="906" y="245" width="95" height="53" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Opsadling_di" bpmnElement="MsgFlow_Opsadling">
+        <di:waypoint x="2630" y="685" />
+        <di:waypoint x="2630" y="230" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2642" y="261" width="62" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_Undervisning_di" bpmnElement="MsgFlow_Undervisning">
+        <di:waypoint x="2830" y="420" />
+        <di:waypoint x="2830" y="230" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2837" y="261" width="89" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_KommuneData_di" bpmnElement="MsgFlow_KommuneData">
+        <di:waypoint x="3515" y="1037" />
+        <di:waypoint x="3515" y="1220" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3529" y="1144" width="107" height="66" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="MsgFlow_KommuneTilsynKrav_di" bpmnElement="MsgFlow_KommuneTilsynKrav">
+        <di:waypoint x="3370" y="1220" />
+        <di:waypoint x="3370" y="1020" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3253" y="1154" width="109" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
