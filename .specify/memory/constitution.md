@@ -1,20 +1,12 @@
 <!--
 ### Sync Impact Report
-- Version change: 1.0.0 → 1.1.0 (Minor version increment)
-- Bump Rationale: Migrated core principles and domain constraints from root CONSTITUTION.md into the official spec-kit format (.specify/memory/constitution.md). Formulated declarative RFC 2119 constraint definitions (MUST/MUST NOT/SHOULD), formalized solver guardrails (HC-01 through HC-08, SC-01 through SC-05), defined offline-first technical constraints, and codified governance gates.
-- Modified Principles:
-  - Princip I: Hestevelfærd Først → I. Hestevelfærd Først (Animal Welfare Above All) [Refined with explicit numeric workload caps & rest requirements]
-  - Princip II: Ryttersikkerhed og Fysiologisk Match → II. Ryttersikkerhed & Fysiologisk Match (Rider Safety & Physiological Compatibility) [Refined with explicit trauma and weight blocks]
-  - Princip III: Revisionssikkerhed og Kommunal Compliance → III. Revisionssikkerhed & Kommunal Compliance (Auditability & Municipal Compliance) [Refined with immutable audit log requirements]
-  - Princip IV: Dataetik, GDPR og Beskyttelse af »Tavs Viden« → IV. Dataetik, GDPR & Beskyttelse af Tavs Viden (Data Privacy & Special Category Protections) [Refined with GDPR Art. 9 & RBAC specifications]
-  - Princip V: Single Source of Truth (SSoT) i et Hårdt Staldmiljø → V. Single Source of Truth & Staldmiljø-Robusthed (SSoT & Barn-Grade UX) [Refined with 15-second interaction limit and offline-first requirement]
+- Version change: 1.1.0 → 1.2.0 (Minor version increment)
+- Bump Rationale: Added new section 'Domænereferencer & Scope-Autoritet (Domain Reference & Scope Authority)' establishing _resources/ as the canonical reference base, with _resources/team/ and specifically _resources/team/feature_prioritization.md (alongside capabilities.md) designated as the primary source of truth for business logic, operational phases, and scope boundaries.
+- Modified Principles: None.
 - Added Sections:
-  - ## Domænebetingelser & Tildelingskabale (Domain Constraints & Allocation Engine)
-  - ## Arkitektoniske Guardrails, Performance & Beredskab (Architectural Guardrails & Contingencies)
-  - ## Governance (Supremacy, Compliance Reviews, RACI & Amendment Procedure)
-- Removed Sections:
-  - Section 7 (Projektleverancer & Eksamenskrav) migrated to project roadmap/planning rather than permanent constitutional governance.
-- Follow-up TODOs: None (All placeholders fully specified with concrete domain rules).
+  - ## Domænereferencer & Scope-Autoritet (Domain Reference & Scope Authority)
+- Removed Sections: None.
+- Follow-up TODOs: None (All placeholders and scope authorities fully specified).
 -->
 
 # Bøgegårdens Ridecenter - Digital Holdadministration & Hestetildeling Constitution
@@ -72,6 +64,26 @@ Løsningen skal fungere som det eneste autoritative sandhedspunkt for holdlister
 - Systemet MUST implementere en Offline-First arkitektur: Holdlister, fremmøderegistrering og akut hestebytning SHALL fungere uafbrudt ved tab af mobil- og internetdækning og automatisk synkronisere konfliktfrit, så snart forbindelsen genoprettes.
 
 *Rationale:* Ridelærerne har nul minutters pause mellem holdene, og staldens placering i et landområde medfører periodiske netudfald. Systemet skal derfor fungere lynhurtigt og fejlfrit uden internetadgang.
+
+## Domænereferencer & Scope-Autoritet (Domain Reference & Scope Authority)
+
+Al forretningslogik, procesflows, kapabiliteter og scope-afgrænsninger i projektet MUST have eksplicit reference til det autoritative kildemateriale i `_resources/`.
+
+### 1. Primær Sandhedskilde (Primary Source of Truth)
+- Indholdet i `_resources/team/` udgør teamets konsoliderede domæneanalyse og operationelle afgrænsning.
+- **[_resources/team/feature_prioritization.md](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/_resources/team/feature_prioritization.md)** fungerer – sammen med **[_resources/team/capabilities.md](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/_resources/team/capabilities.md)** – som den **primære sandhedskilde (Single Source of Truth)** for projektets funktionelle scope, feature-arkitektur og implementeringsrækkefølge.
+- Enhver specifikation (`spec.md`), plan (`plan.md`) og opgaveliste (`tasks.md`) MUST være i overensstemmelse med de definerede faser og prioriteter:
+  - **Fase 1 (Månedlig proces – Oprettelse af holdlister):** F1.1 (Elevønsker i database), F1.2 (Digitalisering af tavs viden under GDPR), F1.3 (Hestedatabase m. adfærd/helbred/højde), F1.4 (Algoritmisk holdlistegenerering/kabale).
+  - **Fase 2 (Før og under undervisning):** F2.1 (Staldelevers statusmeldinger om helbred/adfærd), F2.2 (Akut heste-omplacering ved sygdom via algoritme), F2.3 (Vikardækning ved lærersygdom med digital holdadgang).
+  - **Fase 3 (Afvikling & fremmøde):** F3.1 (Digital fremmøderegistrering/afkrydsningsliste).
+
+### 2. Prioriterings-Guardrails & Scope-Afgrænsning
+- **Quick Wins & Strategiske Nøgleprojekter:** Udvikling og specifikation MUST prioritere de højeffektive initiativer (Quick Wins: F1.1, F1.3, F2.1, F2.3, F3.1 samt Strategiske Projekter: F1.2, F1.4, F2.2).
+- **Deprioriterede funktioner:** Features klassificeret som lav effekt / høj indsats (F1.5 Selvbetjening til elevønsker og F1.6 Selvbetjening til afbud via platform) er eksplicit **udskudt/deprioriteret** og MUST NOT medtages i kernescope for pilotløsningen uden forudgående godkendelse og omklassificering i `feature_prioritization.md`.
+
+### 3. Kontekstuelle Kildereferencer
+- **`_resources/team/`:** Indeholder foruden feature-prioriteringen og kapabilitetsmodellen proceskortlægningen ([AS-IS_Holdadministration.bpmn](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/_resources/team/AS-IS_Holdadministration.bpmn)), [SIPOC_Holdadministration.md](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/_resources/team/SIPOC_Holdadministration.md) samt empiriske interviewnotater med Malene ([interview_notes.md](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/_resources/team/interview_notes.md)), som danner grundlag for krav og antagelser.
+- **`_resources/teacher/`:** Indeholder casemateriale fra underviser/fagansvarlig (herunder `_case-01-Casebeskrivelse, BPMN.md`, `_case-01-Afkrydsningslister.md`, `_case-01-fredagsheste jan-jun TIL CASE.md` og `_case-01-Holdoversigt, uge.md`), der anvendes som historisk, fagspecifik reference og valideringsdata.
 
 ## Domænebetingelser & Tildelingskabale (Domain Constraints & Allocation Engine)
 
@@ -131,7 +143,7 @@ Systemarkitekturen skal understøtte stabil og responsiv drift i staldmiljøet s
 Denne Constitution udgør det øverste styringsdokument for projektet og har forrang frem for alle øvrige specifikationer, procesmodeller, arkitekturskitser og prototyper.
 
 ### Compliance & Kvalitetsporte
-- Alle specifikationer (`spec.md`), tekniske planer (`plan.md`), opgavelister (`tasks.md`) og implementeringer MUST verificeres mod de 5 kardinalprincipper, de hårde restriktioner (HC-01 til HC-08) og de arkitektoniske guardrails.
+- Alle specifikationer (`spec.md`), tekniske planer (`plan.md`), opgavelister (`tasks.md`) og implementeringer MUST verificeres mod de 5 kardinalprincipper, de hårde restriktioner (HC-01 til HC-08), de arkitektoniske guardrails samt scope-afgrænsningen i `_resources/team/feature_prioritization.md`.
 - Enhver foreslået funktionalitet, der bryder eller udvander dyrevelfærd, ryttersikkerhed eller revisionssikkerhed, er automatisk ugyldig.
 
 ### Stakeholder RACI Matrix
@@ -151,4 +163,4 @@ Denne Constitution udgør det øverste styringsdokument for projektet og har for
   - **MINOR:** Tilføjelse af nye principper, sektioner eller væsentligt udvidede domæneguardrails.
   - **PATCH:** Præciseringer, sproglige rettelser og ikke-semantiske tilretninger.
 
-**Version**: 1.1.0 | **Ratified**: 2026-09-29 | **Last Amended**: 2026-10-04
+**Version**: 1.2.0 | **Ratified**: 2026-09-29 | **Last Amended**: 2026-10-04
