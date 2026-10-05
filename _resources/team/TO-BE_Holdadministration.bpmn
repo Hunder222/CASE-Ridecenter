@@ -329,7 +329,7 @@
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Participant_Boegegaarden_di" bpmnElement="Participant_Boegegaarden" isHorizontal="true">
-        <dc:Bounds x="156" y="380" width="3644" height="670" />
+        <dc:Bounds x="156" y="383" width="3644" height="667" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_LedelseKontor_di" bpmnElement="Lane_LedelseKontor" isHorizontal="true">
@@ -341,7 +341,7 @@
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_Ridelaerer_di" bpmnElement="Lane_Ridelaerer" isHorizontal="true">
-        <dc:Bounds x="186" y="380" width="3614" height="270" />
+        <dc:Bounds x="186" y="383" width="3614" height="267" />
         <bpmndi:BPMNLabel />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Activity_PROC_01_IndtastOensker_di" bpmnElement="Activity_PROC_01_IndtastOensker" bioc:stroke="#28a745" bioc:fill="#d4edda" color:background-color="#d4edda" color:border-color="#28a745">
@@ -705,21 +705,21 @@
         <di:waypoint x="1115" y="420" />
         <di:waypoint x="1115" y="230" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="1126" y="246" width="112" height="40" />
+          <dc:Bounds x="1120" y="246" width="106" height="53" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="MsgFlow_Forklaring_di" bpmnElement="MsgFlow_Forklaring">
         <di:waypoint x="885" y="420" />
         <di:waypoint x="885" y="230" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="906" y="245" width="95" height="53" />
+          <dc:Bounds x="890" y="245" width="111" height="53" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="MsgFlow_Opsadling_di" bpmnElement="MsgFlow_Opsadling">
         <di:waypoint x="2630" y="685" />
         <di:waypoint x="2630" y="230" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="2642" y="261" width="62" height="40" />
+          <dc:Bounds x="2642" y="261" width="78" height="40" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="MsgFlow_Undervisning_di" bpmnElement="MsgFlow_Undervisning">
@@ -733,7 +733,7 @@
         <di:waypoint x="3515" y="1037" />
         <di:waypoint x="3515" y="1220" />
         <bpmndi:BPMNLabel>
-          <dc:Bounds x="3529" y="1144" width="107" height="66" />
+          <dc:Bounds x="3523" y="1141" width="113" height="66" />
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="MsgFlow_KommuneTilsynKrav_di" bpmnElement="MsgFlow_KommuneTilsynKrav">
