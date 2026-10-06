@@ -5,6 +5,12 @@ import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from 'fas
 import { z } from 'zod';
 import type { Config } from './config';
 import { authRuter } from './moduler/auth/routes';
+import { hesteRuter } from './moduler/heste/routes';
+import { holdRuter } from './moduler/hold/routes';
+import { notifikationsRuter } from './moduler/notifikationer/routes';
+import { oenskeRuter } from './moduler/oensker/routes';
+import { rytterRuter } from './moduler/ryttere/routes';
+import { tildelingsRuter } from './moduler/tildeling/routes';
 import { registrerFejlhaandtering } from './plugins/fejl';
 import { registrerKrypto } from './plugins/krypto';
 
@@ -35,6 +41,13 @@ export async function buildApp({ config, prisma, ur = () => new Date(), logger =
     async (api) => {
       api.get('/sundhed', async () => ({ ok: true }));
       await api.register(authRuter);
+      // RBAC pr. endpoint efter x-roller i openapi.yaml (kraevRoller i hvert modul).
+      await api.register(hesteRuter);
+      await api.register(rytterRuter);
+      await api.register(holdRuter);
+      await api.register(oenskeRuter);
+      await api.register(notifikationsRuter);
+      await api.register(tildelingsRuter);
     },
     { prefix: '/api/v1' },
   );

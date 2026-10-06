@@ -42,7 +42,10 @@ export const HestInput = z.strictObject({
 });
 export type HestInput = z.infer<typeof HestInput>;
 
-export const HestOpdatering = HestInput.partial();
+/** Delvis opdatering. Uden defaults, så felter, der ikke sendes, ikke nulstilles (Zod 4 anvender defaults i partial). */
+export const HestOpdatering = HestInput.extend({
+  staldnoter: z.string().max(500, 'Staldnoter må højst være 500 tegn'),
+}).partial();
 export type HestOpdatering = z.infer<typeof HestOpdatering>;
 
 // ---------------------------------------------------------------- Hold
@@ -103,7 +106,13 @@ export const RytterInput = z.strictObject({
 });
 export type RytterInput = z.infer<typeof RytterInput>;
 
-export const RytterOpdatering = RytterInput.partial();
+/** Delvis opdatering uden defaults (se HestOpdatering). */
+export const RytterOpdatering = RytterInput.extend({
+  klar_til_udvikling: z.boolean(),
+  er_hjaelper: z.boolean(),
+  partaftale_hest_id: Uuid.nullable(),
+  partaftale_godkendt_trods_niveau: z.boolean(),
+}).partial();
 export type RytterOpdatering = z.infer<typeof RytterOpdatering>;
 
 // ---------------------------------------------------------------- Sikkerhedsprofil (GDPR art. 9, kun Ledelse)
