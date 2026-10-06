@@ -1,0 +1,959 @@
+openapi: 3.1.0
+info:
+  title: Bøgegårdens Ridecenter – Holdadministration API (POC)
+  version: 0.1.0
+  description: |
+    REST-kontrakt for POC'en (se ../plan.md og ../research.md).
+    - Stald-enheder (tablet/mobil) skriver primært via `/sync/push` (offline-first, se sync-protocol.md)
+      og læser via `/stald/dag/{dato}` + `/sync/pull`.
+    - Web-admin (Ledelse/Ridelærer) bruger de øvrige endpoints online.
+    - RBAC håndhæves pr. endpoint (x-roller) OG pr. felt via faste DTO-projektioner:
+      stald-DTO'er indeholder ALDRIG Art. 9-felter, vægt/højde eller kontaktinfo.
+    - Alle tider er ISO 8601 (UTC); forretningsregler fortolkes i Europe/Copenhagen.
+    - Fejl returneres som `Fejl` med maskinlæsbar `kode` (f.eks. `HC01_DAGSGRAENSE`).
+servers:
+  - url: http://localhost:3000/api/v1
+tags:
+  - name: Auth
+  - name: Stald
+  - name: Sync
+  - name: Heste
+  - name: Ryttere
+  - name: Hold
+  - name: Tildeling
+  - name: Lektioner
+  - name: Venteliste
+  - name: Vikar
+  - name: Dashboard
+  - name: Rapporter
+  - name: Audit
+
+security:
+  - session: []
+
+paths:
+  # ---------------------------------------------------------------- Auth
+  /auth/web/login:
+    post:
+      tags: [Auth]
+      summary: Web-login for Ledelse/Ridelærer (e-mail + adgangskode)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, adgangskode]
+              properties:
+                email: { type: string, format: email }
+                adgangskode: { type: string, minLength: 8 }
+      responses:
+        '200': { description: Session oprettet (httpOnly-cookie), content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '401': { $ref: '#/components/responses/Fejl' }
+
+  /auth/enheder:
+    post:
+      tags: [Auth]
+      summary: Udsted enrollment-token til ny stald-enhed
+      x-roller: [Ledelse]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [navn], properties: { navn: { type: string } } }
+      responses:
+        '201':
+          description: Token vises én gang
+          content:
+            application/json:
+              schema: { type: object, properties: { enhed_id: { type: string, format: uuid }, enrollment_token: { type: string } } }
+
+  /auth/enheder/registrer:
+    post:
+      tags: [Auth]
+      summary: Enheden indløser enrollment-token og får enhedsnøgle
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [enrollment_token], properties: { enrollment_token: { type: string } } }
+      responses:
+        '200':
+          description: Enhed registreret
+          content:
+            application/json:
+              schema: { type: object, properties: { enhed_id: { type: string, format: uuid }, enhedsnoegle: { type: string } } }
+        '401': { $ref: '#/components/responses/Fejl' }
+
+  /auth/pin:
+    post:
+      tags: [Auth]
+      summary: Online PIN-login på betroet enhed (offline sker verifikation lokalt, se sync-protocol.md)
+      security: [ { enhed: [] } ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pin]
+              properties:
+                pin: { type: string, pattern: '^[0-9]{4}$' }
+      responses:
+        '200': { description: Session, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '401': { $ref: '#/components/responses/Fejl' }
+        '429': { description: 'Spærret efter 5 forkerte forsøg (60 sek.)' }
+
+  /auth/vikar:
+    post:
+      tags: [Auth, Vikar]
+      summary: Vikar indløser engangskode + fulde navn (FR-013, US3 AS1)
+      security: [ { enhed: [] } ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kode, fulde_navn]
+              properties:
+                kode: { type: string, pattern: '^[0-9]{6}$' }
+                fulde_navn: { type: string, minLength: 3 }
+      responses:
+        '200': { description: 'Vikarsession gyldig til 23:59 samme dag; kode → Anvendt; Ledelse adviseres', content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '401': { $ref: '#/components/responses/Fejl' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      responses: { '204': { description: Logget ud } }
+
+  # ---------------------------------------------------------------- Stald (læsning)
+  /stald/dag/{dato}:
+    get:
+      tags: [Stald]
+      summary: Dagens lektioner og pladser i stald-projektion (cachebar offline)
+      x-roller: [Ridelaerer, Vikar, Ledelse, Staldelev]
+      description: |
+        Staldelev får kun hestedelen (ingen rytterpladser). Vikar får kun datoen for vikarsessionen.
+      parameters:
+        - $ref: '#/components/parameters/Dato'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StaldDag' }
+
+  # ---------------------------------------------------------------- Sync
+  /sync/push:
+    post:
+      tags: [Sync]
+      summary: Batch af outbox-kommandoer (idempotent pr. kommando_id)
+      security: [ { enhed: [], session: [] } ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enhed_id, kommandoer]
+              properties:
+                enhed_id: { type: string, format: uuid }
+                kommandoer:
+                  type: array
+                  maxItems: 500
+                  items: { $ref: '#/components/schemas/Kommando' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resultater:
+                    type: array
+                    items: { $ref: '#/components/schemas/KommandoResultat' }
+
+  /sync/pull:
+    get:
+      tags: [Sync]
+      summary: Ændringer siden cursor (stald-projektion)
+      security: [ { enhed: [], session: [] } ]
+      parameters:
+        - in: query
+          name: cursor
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PullSvar' }
+
+  /events:
+    get:
+      tags: [Sync]
+      summary: Server-Sent Events (rollefiltreret realtid, R9)
+      responses:
+        '200':
+          description: 'text/event-stream; event-typer: plads.opdateret, hest.status, afbud.registreret, vikar.login, forslag.oprettet, notifikation.ny'
+          content:
+            text/event-stream:
+              schema: { type: string }
+
+  # ---------------------------------------------------------------- Heste
+  /heste:
+    get:
+      tags: [Heste]
+      x-roller: [Ledelse, Ridelaerer]
+      responses:
+        '200': { content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Hest' } } } } }
+    post:
+      tags: [Heste]
+      x-roller: [Ledelse]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/HestInput' } } } }
+      responses:
+        '201': { content: { application/json: { schema: { $ref: '#/components/schemas/Hest' } } } }
+        '422': { $ref: '#/components/responses/Fejl' }
+  /heste/{id}:
+    patch:
+      tags: [Heste]
+      x-roller: [Ledelse]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/HestInput' } } } }
+      responses:
+        '200': { content: { application/json: { schema: { $ref: '#/components/schemas/Hest' } } } }
+        '422': { $ref: '#/components/responses/Fejl' }
+
+  # ---------------------------------------------------------------- Ryttere
+  /ryttere:
+    get:
+      tags: [Ryttere]
+      x-roller: [Ledelse]
+      responses:
+        '200': { content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Rytter' } } } } }
+    post:
+      tags: [Ryttere]
+      x-roller: [Ledelse]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/RytterInput' } } } }
+      responses:
+        '201': { content: { application/json: { schema: { $ref: '#/components/schemas/Rytter' } } } }
+  /ryttere/{id}:
+    patch:
+      tags: [Ryttere]
+      x-roller: [Ledelse]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/RytterInput' } } } }
+      responses:
+        '200': { content: { application/json: { schema: { $ref: '#/components/schemas/Rytter' } } } }
+  /ryttere/{id}/sikkerhedsprofil:
+    get:
+      tags: [Ryttere]
+      summary: Fuld Art. 9-profil (læsning auditlogges)
+      x-roller: [Ledelse]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200': { content: { application/json: { schema: { $ref: '#/components/schemas/Sikkerhedsprofil' } } } }
+    put:
+      tags: [Ryttere]
+      x-roller: [Ledelse]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/Sikkerhedsprofil' } } } }
+      responses:
+        '200': { content: { application/json: { schema: { $ref: '#/components/schemas/Sikkerhedsprofil' } } } }
+        '422': { description: 'f.eks. INSTRUKS_INDEHOLDER_DIAGNOSE', content: { application/json: { schema: { $ref: '#/components/schemas/Fejl' } } } }
+  /ryttere/{id}/opsigelse:
+    post:
+      tags: [Ryttere]
+      summary: Registrér opsigelse; slutdato = sidste dag i måneden + 30 dage (FR-015)
+      x-roller: [Ledelse]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [modtaget_dato], properties: { modtaget_dato: { type: string, format: date } } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { type: object, properties: { slutdato: { type: string, format: date }, genbesaettelsesforslag_id: { type: string, format: uuid } } }
+  /cheat-sheet-koder:
+    get:
+      tags: [Ryttere]
+      x-roller: [Ledelse, Ridelaerer, Vikar]
+      responses:
+        '200': { content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/CheatSheetKode' } } } } }
+
+  # ---------------------------------------------------------------- Hold & ønsker
+  /hold:
+    get:
+      tags: [Hold]
+      x-roller: [Ledelse, Ridelaerer]
+      responses:
+        '200': { content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Hold' } } } } }
+    post:
+      tags: [Hold]
+      x-roller: [Ledelse]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/Hold' } } } }
+      responses: { '201': { content: { application/json: { schema: { $ref: '#/components/schemas/Hold' } } } } }
+  /hold/{id}/tilmeldinger:
+    post:
+      tags: [Hold]
+      x-roller: [Ledelse]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [rytter_id, gyldig_fra], properties: { rytter_id: { type: string, format: uuid }, gyldig_fra: { type: string, format: date } } }
+      responses:
+        '201': { description: Tilmeldt }
+        '409': { description: 'HOLD_FULDT (max_kapacitet)', content: { application/json: { schema: { $ref: '#/components/schemas/Fejl' } } } }
+  /oensker/{maaned}:
+    get:
+      tags: [Hold]
+      x-roller: [Ledelse, Ridelaerer]
+      parameters: [ { $ref: '#/components/parameters/Maaned' } ]
+      responses:
+        '200': { content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Elevoenske' } } } } }
+    put:
+      tags: [Hold]
+      summary: Registrér/erstat en rytters 3 ønsker for måneden (F1.1) – stald-varianten går via sync-kommandoen RegistrerOensker
+      x-roller: [Ledelse, Ridelaerer]
+      parameters: [ { $ref: '#/components/parameters/Maaned' } ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rytter_id, oensker]
+              properties:
+                rytter_id: { type: string, format: uuid }
+                oensker: { type: array, maxItems: 3, items: { type: string, format: uuid, description: 'hest_id i prioriteret rækkefølge' } }
+      responses: { '204': { description: Gemt } }
+
+  # ---------------------------------------------------------------- Tildeling (Kabalen)
+  /tildeling/koersler:
+    post:
+      tags: [Tildeling]
+      summary: Kør tildelingsmotoren for en måned → Kladde (eller Afvist ved Welfare Guard-fejl)
+      x-roller: [Ledelse, Ridelaerer]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [maaned], properties: { maaned: { $ref: '#/components/schemas/Maaned' } } }
+      responses:
+        '201': { content: { application/json: { schema: { $ref: '#/components/schemas/Tildelingskoersel' } } } }
+  /tildeling/koersler/{id}:
+    get:
+      tags: [Tildeling]
+      x-roller: [Ledelse, Ridelaerer]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200': { content: { application/json: { schema: { $ref: '#/components/schemas/Tildelingskoersel' } } } }
+  /tildeling/koersler/{id}/tildelinger/{tildelingId}:
+    patch:
+      tags: [Tildeling]
+      summary: Manuel justering i Kladde – valideres live af Welfare Guard; kan ikke omgås (Princip I)
+      x-roller: [Ledelse, Ridelaerer]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - { in: path, name: tildelingId, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, required: [hest_id], properties: { hest_id: { type: string, format: uuid } } }
+      responses:
+        '200': { content: { application/json: { schema: { $ref: '#/components/schemas/Hestetildeling' } } } }
+        '422': { description: 'HC-overtrædelse – årsagskoder i Fejl.detaljer', content: { application/json: { schema: { $ref: '#/components/schemas/Fejl' } } } }
+  /tildeling/koersler/{id}/godkend:
+    post:
+      tags: [Tildeling]
+      x-roller: [Ledelse, Ridelaerer]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses: { '200': { description: Godkendt } }
+  /tildeling/koersler/{id}/publicer:
+    post:
+      tags: [Tildeling]
+      summary: Publicér → opretter Lektioner og LektionsPladser for måneden; pushes til enheder
+      x-roller: [Ledelse]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200': { description: Publiceret }
+        '409': { description: 'IKKE_GODKENDT eller WELFARE_GUARD_FEJL' }
+
+  # ---------------------------------------------------------------- Lektioner (admin-varianter; stald bruger sync-kommandoer)
+  /lektionspladser/{id}/erstatningsforslag:
+    get:
+      tags: [Lektioner]
+      summary: Top-3 godkendte erstatningsheste (FR-011). Samme domænefunktion kører offline på enheden.
+      x-roller: [Ledelse, Ridelaerer, Vikar]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses:
+        '200': { content: { application/json: { schema: { $ref: '#/components/schemas/Erstatningsforslag' } } } }
+  /lektioner/{id}/afbud:
+    post:
+      tags: [Lektioner]
+      summary: Registrér afbud (rettidighed beregnes; FR-014)
+      x-roller: [Ledelse, Ridelaerer]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rytter_id]
+              properties:
+                rytter_id: { type: string, format: uuid }
+                modtaget_tidspunkt: { type: string, format: date-time, description: 'Default = nu; må ikke ligge i fremtiden' }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [Afbud_rettidigt, Afbud_for_sent] }
+                  genbesaettelsesforslag_id: { type: [string, 'null'], format: uuid }
+  /fremmoede/{id}/korrektion:
+    post:
+      tags: [Lektioner]
+      summary: Efterkorrektion – ny append-only række med påkrævet begrundelse (US1 AS5)
+      x-roller: [Ledelse, Ridelaerer]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ny_status, begrundelse]
+              properties:
+                ny_status: { $ref: '#/components/schemas/FremmoedeStatus' }
+                begrundelse: { type: string, minLength: 5 }
+      responses:
+        '201': { description: Korrektion registreret }
+        '422': { $ref: '#/components/responses/Fejl' }
+
+  # ---------------------------------------------------------------- Venteliste & forslag
+  /venteliste:
+    get:
+      tags: [Venteliste]
+      x-roller: [Ledelse]
+      responses:
+        '200': { content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Venteliste' } } } } }
+    post:
+      tags: [Venteliste]
+      x-roller: [Ledelse]
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/Venteliste' } } } }
+      responses: { '201': { description: Oprettet } }
+  /genbesaettelsesforslag:
+    get:
+      tags: [Venteliste]
+      x-roller: [Ledelse]
+      parameters:
+        - { in: query, name: status, schema: { type: string, enum: [Afventer, Godkendt, Afvist, Udloebet] } }
+      responses:
+        '200': { content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Genbesaettelsesforslag' } } } } }
+  /genbesaettelsesforslag/{id}/{beslutning}:
+    post:
+      tags: [Venteliste]
+      summary: Malene godkender/afviser efter manuel kontakt
+      x-roller: [Ledelse]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - { in: path, name: beslutning, required: true, schema: { type: string, enum: [godkend, afvis] } }
+      responses: { '200': { description: Behandlet } }
+
+  # ---------------------------------------------------------------- Vikarkoder
+  /vikarkoder:
+    get:
+      tags: [Vikar]
+      x-roller: [Ledelse]
+      responses:
+        '200': { content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/VikarEngangskode' } } } } }
+    post:
+      tags: [Vikar]
+      summary: Udsted N engangskoder (klartekst returneres kun her)
+      x-roller: [Ledelse]
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object, properties: { antal: { type: integer, minimum: 1, maximum: 10, default: 1 }, gyldig_dage: { type: integer, default: 90 } } }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/VikarEngangskode'
+                    - type: object
+                      properties: { kode_klartekst: { type: string, pattern: '^[0-9]{6}$' } }
+  /vikarkoder/{id}/spaer:
+    post:
+      tags: [Vikar]
+      summary: 'Spær kode eller fjernafslut aktiv vikarsession (edge case: mistet kode)'
+      x-roller: [Ledelse]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses: { '200': { description: Spærret } }
+
+  # ---------------------------------------------------------------- Dashboard
+  /dashboard/noegletal:
+    get:
+      tags: [Dashboard]
+      x-roller: [Ledelse]
+      parameters:
+        - { in: query, name: uge, schema: { type: string, pattern: '^[0-9]{4}-W[0-9]{2}$' } }
+      responses:
+        '200': { content: { application/json: { schema: { $ref: '#/components/schemas/Noegletal' } } } }
+  /notifikationer:
+    get:
+      tags: [Dashboard]
+      x-roller: [Ledelse]
+      responses:
+        '200': { content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/DashboardNotifikation' } } } } }
+  /notifikationer/{id}/kvitter:
+    post:
+      tags: [Dashboard]
+      x-roller: [Ledelse]
+      parameters: [ { $ref: '#/components/parameters/Id' } ]
+      responses: { '204': { description: Kvitteret } }
+
+  # ---------------------------------------------------------------- Rapporter & audit
+  /rapporter/kommune:
+    post:
+      tags: [Rapporter]
+      summary: 1-klik tilsynsrapport (FR-018, SC-009 <5 sek.)
+      x-roller: [Ledelse]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fra, til]
+              properties:
+                fra: { type: string, format: date }
+                til: { type: string, format: date }
+                format: { type: string, enum: [CSV, HTML], default: CSV }
+      responses:
+        '201':
+          description: Fil + metadata (headers X-Fil-SHA256, X-Kaede-Hovedhash)
+          content:
+            text/csv: { schema: { type: string } }
+            text/html: { schema: { type: string } }
+  /rapporter:
+    get:
+      tags: [Rapporter]
+      x-roller: [Ledelse]
+      responses:
+        '200': { content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/RapportUdtraek' } } } } }
+  /audit:
+    get:
+      tags: [Audit]
+      x-roller: [Ledelse]
+      parameters:
+        - { in: query, name: fra, schema: { type: string, format: date-time } }
+        - { in: query, name: til, schema: { type: string, format: date-time } }
+        - { in: query, name: handling, schema: { type: string } }
+        - { in: query, name: entitet_id, schema: { type: string, format: uuid } }
+      responses:
+        '200': { content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AuditHaendelse' } } } } }
+  /audit/verificer:
+    post:
+      tags: [Audit]
+      summary: Verificér hashkæden (R11)
+      x-roller: [Ledelse]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gyldig: { type: boolean }
+                  antal_raekker: { type: integer }
+                  foerste_brud_id: { type: [string, 'null'] }
+                  hovedhash: { type: string }
+
+components:
+  securitySchemes:
+    session: { type: http, scheme: bearer, description: 'Kortlivet sessionstoken (cookie på web, bearer på enhed)' }
+    enhed: { type: apiKey, in: header, name: X-Enhed-Noegle }
+
+  parameters:
+    Id: { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    Dato: { in: path, name: dato, required: true, schema: { type: string, format: date } }
+    Maaned: { in: path, name: maaned, required: true, schema: { $ref: '#/components/schemas/Maaned' } }
+
+  responses:
+    Fejl:
+      description: Fejl
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Fejl' }
+
+  schemas:
+    Maaned: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+    Rolle: { type: string, enum: [Ledelse, Ridelaerer, Vikar, Staldelev] }
+    FremmoedeStatus: { type: string, enum: [Fremmoedt, Afbud_rettidigt, Afbud_for_sent, Udeblevet] }
+    Aarsagskode:
+      type: string
+      description: Se domain-engine.md#4-årsagskoder
+      examples: [HC01_DAGSGRAENSE, HC07_FORBUDT_HEST, SC01_OENSKE_1, ALT_TILDELING]
+
+    Fejl:
+      type: object
+      required: [kode, besked]
+      properties:
+        kode: { type: string }
+        besked: { type: string, description: Dansk, brugervendt }
+        detaljer: { type: array, items: { $ref: '#/components/schemas/Aarsagskode' } }
+
+    Session:
+      type: object
+      properties:
+        bruger_id: { type: string, format: uuid }
+        navn: { type: string }
+        roller: { type: array, items: { $ref: '#/components/schemas/Rolle' } }
+        udloeber: { type: string, format: date-time }
+
+    Hest:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        navn: { type: string }
+        stangmaal_cm: { type: integer }
+        max_rytter_vaegt_kg: { type: integer }
+        max_rytter_hoejde_cm: { type: [integer, 'null'] }
+        temperament: { type: string, enum: [Rolig, Normal, Frisk] }
+        godkendt_til_begyndere: { type: boolean }
+        egnet_oevet: { type: boolean }
+        skaane: { type: boolean }
+        max_lektioner_dag: { type: integer, enum: [2, 3] }
+        springforbud: { type: boolean }
+        max_spring_uge: { type: integer, enum: [0, 1] }
+        hviledag: { type: integer, minimum: 1, maximum: 7 }
+        sundhedsstatus: { type: string, enum: [Aktiv, Sygemeldt, Skadet, Karantaene] }
+        staldnoter: { type: string }
+        aktiv: { type: boolean }
+    HestInput:
+      type: object
+      description: Som Hest uden id/afledte felter (max_lektioner_dag, max_spring_uge afledes)
+      properties:
+        navn: { type: string }
+        stangmaal_cm: { type: integer, minimum: 80, maximum: 190 }
+        max_rytter_vaegt_kg: { type: integer }
+        max_rytter_hoejde_cm: { type: [integer, 'null'] }
+        temperament: { type: string, enum: [Rolig, Normal, Frisk] }
+        godkendt_til_begyndere: { type: boolean }
+        egnet_oevet: { type: boolean }
+        skaane: { type: boolean }
+        springforbud: { type: boolean }
+        hviledag: { type: integer, minimum: 1, maximum: 7 }
+        staldnoter: { type: string, maxLength: 500 }
+
+    Rytter:
+      type: object
+      description: Admin-projektion (kun Ledelse)
+      properties:
+        id: { type: string, format: uuid }
+        fornavn: { type: string }
+        efternavn: { type: string }
+        foedselsdato: { type: string, format: date }
+        bopaelskommune: { type: string }
+        hoejde_cm: { type: integer }
+        vaegt_kg: { type: integer }
+        erfaringsniveau: { type: string, enum: [Begynder, Letoevet, Oevet] }
+        klar_til_udvikling: { type: boolean }
+        er_hjaelper: { type: boolean }
+        kontaktperson_navn: { type: string }
+        kontakt_telefon: { type: string }
+        kontakt_email: { type: string }
+        partaftale_hest_id: { type: [string, 'null'], format: uuid }
+        partaftale_godkendt_trods_niveau: { type: boolean, description: 'Kun Ledelse; auditlogges (HC-08)' }
+        aktiv_status: { type: string, enum: [Aktiv, Pauseret, Opsagt] }
+        slutdato: { type: [string, 'null'], format: date }
+    RytterInput:
+      type: object
+      properties:
+        fornavn: { type: string }
+        efternavn: { type: string }
+        foedselsdato: { type: string, format: date }
+        bopaelskommune: { type: string }
+        hoejde_cm: { type: integer, minimum: 80, maximum: 210 }
+        vaegt_kg: { type: integer, minimum: 15, maximum: 150 }
+        erfaringsniveau: { type: string, enum: [Begynder, Letoevet, Oevet] }
+        klar_til_udvikling: { type: boolean }
+        er_hjaelper: { type: boolean }
+        kontaktperson_navn: { type: string }
+        kontakt_telefon: { type: string }
+        kontakt_email: { type: string, format: email }
+        partaftale_hest_id: { type: [string, 'null'], format: uuid }
+        partaftale_godkendt_trods_niveau: { type: boolean, description: 'Kun Ledelse; auditlogges (HC-08)' }
+
+    Sikkerhedsprofil:
+      type: object
+      description: Fuld Art. 9-projektion – KUN Ledelse
+      properties:
+        rytter_id: { type: string, format: uuid }
+        faldtraume_note: { type: [string, 'null'] }
+        angstkategori: { type: [string, 'null'] }
+        intern_note: { type: [string, 'null'] }
+        cheat_sheet_koder: { type: array, items: { type: string } }
+        adfaerdsinstruks: { type: string, maxLength: 200 }
+        forbudte_heste: { type: array, items: { type: string, format: uuid } }
+        paakraevede_heste: { type: array, items: { type: string, format: uuid } }
+        kun_rolige_heste: { type: boolean }
+    CheatSheetKode:
+      type: object
+      properties:
+        kode: { type: string }
+        tekst: { type: string }
+        kategori: { type: string, enum: [Haandtering, Afstand, Opstigning, Kommunikation] }
+
+    Hold:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        holdnavn: { type: string }
+        niveau: { type: string, enum: [Traekhold, Begynder, Letoevet, Oevet, Parthold] }
+        er_springhold: { type: boolean }
+        ugedag: { type: integer, minimum: 1, maximum: 7 }
+        starttid: { type: string, pattern: '^[0-2][0-9]:[0-5][0-9]$' }
+        varighed_min: { type: integer }
+        max_kapacitet: { type: integer, minimum: 1, maximum: 10 }
+        fast_underviser_id: { type: string, format: uuid }
+    Elevoenske:
+      type: object
+      properties:
+        rytter_id: { type: string, format: uuid }
+        maaned: { $ref: '#/components/schemas/Maaned' }
+        prioritet: { type: integer, enum: [1, 2, 3] }
+        oensket_hest_id: { type: string, format: uuid }
+        kan_opfyldes: { type: boolean, description: 'false hvis hesten er spærret for rytteren (HC-07) – begrundelse vises kun for Ledelse' }
+
+    Tildelingskoersel:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        maaned: { $ref: '#/components/schemas/Maaned' }
+        status: { type: string, enum: [Kladde, Afvist, Godkendt, Publiceret, Forkastet] }
+        solver_version: { type: string }
+        input_hash: { type: string }
+        varighed_ms: { type: integer }
+        statistik:
+          type: object
+          properties:
+            oenske_1: { type: integer }
+            oenske_2: { type: integer }
+            oenske_3: { type: integer }
+            alternativ: { type: integer }
+            ikke_tildelt: { type: integer }
+        welfare_guard_overtraedelser: { type: array, items: { $ref: '#/components/schemas/Aarsagskode' } }
+        tildelinger: { type: array, items: { $ref: '#/components/schemas/Hestetildeling' } }
+    Hestetildeling:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        hold_id: { type: string, format: uuid }
+        rytter_id: { type: string, format: uuid }
+        hest_id: { type: [string, 'null'], format: uuid }
+        oenske_opfyldt: { type: [integer, 'null'], enum: [1, 2, 3, null] }
+        er_alternativ_tildeling: { type: boolean }
+        turnus_score: { type: integer }
+        turnus_naeste_maaned: { type: integer }
+        begrundelse_koder: { type: array, items: { $ref: '#/components/schemas/Aarsagskode' } }
+        begrundelse_tekst: { type: string }
+        manuelt_justeret: { type: boolean }
+
+    StaldDag:
+      type: object
+      description: Stald-projektion – indeholder ALDRIG vægt, højde, kontaktinfo, fødselsdato eller Art. 9-felter
+      properties:
+        dato: { type: string, format: date }
+        lektioner:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              holdnavn: { type: string }
+              niveau: { type: string }
+              er_springhold: { type: boolean }
+              starttid: { type: string }
+              underviser_navn: { type: string }
+              pladser:
+                type: array
+                items: { $ref: '#/components/schemas/StaldPlads' }
+        heste:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              navn: { type: string }
+              sundhedsstatus: { type: string }
+              staldnoter: { type: string }
+              temperament: { type: string }
+              hviledag: { type: integer }
+              max_lektioner_dag: { type: integer }
+              spring_brugt_uge: { type: integer }
+              max_spring_uge: { type: integer }
+    StaldPlads:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        rytter_visningsnavn: { type: string, description: 'Fornavn + efternavnsinitial' }
+        aktuel_hest_id: { type: [string, 'null'], format: uuid }
+        planlagt_hest_id: { type: [string, 'null'], format: uuid }
+        er_alternativ_tildeling: { type: boolean }
+        fremmoede_status: { oneOf: [ { $ref: '#/components/schemas/FremmoedeStatus' }, { type: 'null' } ] }
+        godkendte_heste: { type: array, items: { type: string, format: uuid }, description: 'Statisk forudberegnet egnethed (R6)' }
+        maanedens_oensker: { type: array, items: { type: string, format: uuid } }
+        cheat_sheet:
+          type: object
+          properties:
+            koder: { type: array, items: { $ref: '#/components/schemas/CheatSheetKode' } }
+            instruks: { type: string }
+
+    Kommando:
+      type: object
+      description: Se sync-protocol.md for payload pr. type
+      required: [kommando_id, type, klient_tidspunkt, bruger_id, payload]
+      properties:
+        kommando_id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [RegistrerFremmoede, KorrigerFremmoede, RegistrerAfbud, MeldHestStatus, GodkendOmplacering, RegistrerOensker, VikarLogin]
+        klient_tidspunkt: { type: string, format: date-time }
+        bruger_id: { type: string, format: uuid }
+        session_id: { type: string }
+        payload: { type: object }
+    KommandoResultat:
+      type: object
+      properties:
+        kommando_id: { type: string, format: uuid }
+        status: { type: string, enum: [Anvendt, AlleredeAnvendt, Konflikt, Afvist] }
+        fejl: { $ref: '#/components/schemas/Fejl' }
+    PullSvar:
+      type: object
+      properties:
+        cursor: { type: string }
+        aendringer:
+          type: array
+          items:
+            type: object
+            properties:
+              entitet: { type: string, enum: [lektion, plads, hest, bruger, vikarkode] }
+              id: { type: string, format: uuid }
+              operation: { type: string, enum: [upsert, slet] }
+              data: { type: object }
+
+    Erstatningsforslag:
+      type: object
+      properties:
+        lektionsplads_id: { type: string, format: uuid }
+        forslag:
+          type: array
+          maxItems: 3
+          items:
+            type: object
+            properties:
+              hest_id: { type: string, format: uuid }
+              rang: { type: integer }
+              dagsbelastning_efter: { type: integer }
+              begrundelse_koder: { type: array, items: { $ref: '#/components/schemas/Aarsagskode' } }
+        kapacitetsmangel: { type: boolean, description: 'true hvis < 3 lovlige kandidater (edge case)' }
+        beregningstid_ms: { type: integer }
+
+    Venteliste:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        rytter_id: { type: string, format: uuid }
+        oensket_hold_id: { type: [string, 'null'], format: uuid }
+        oensket_niveau: { type: [string, 'null'] }
+        tilmeldingsdato: { type: string, format: date }
+        status: { type: string, enum: [Aktiv, Forslag_genereret, Optaget, Afslaaet] }
+    Genbesaettelsesforslag:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [Enkeltlektion, FastPlads] }
+        lektion_id: { type: [string, 'null'], format: uuid }
+        hold_id: { type: string, format: uuid }
+        ledig_fra: { type: [string, 'null'], format: date }
+        frigjort_hest_id: { type: [string, 'null'], format: uuid }
+        kandidat:
+          type: object
+          properties:
+            venteliste_id: { type: string, format: uuid }
+            navn: { type: string }
+            kontaktperson: { type: string }
+            telefon: { type: string }
+        status: { type: string, enum: [Afventer, Godkendt, Afvist, Udloebet] }
+        oprettet: { type: string, format: date-time }
+    VikarEngangskode:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [Aktiv, Anvendt, Udloebet, Spaerret] }
+        udstedt_dato: { type: string, format: date-time }
+        udloebsdato: { type: string, format: date-time }
+        anvendt_dato: { type: [string, 'null'], format: date-time }
+        anvendt_af_vikarnavn: { type: [string, 'null'] }
+
+    Noegletal:
+      type: object
+      properties:
+        uge: { type: string }
+        holdudnyttelse_pct: { type: number }
+        holdudnyttelse_pr_hold: { type: array, items: { type: object, properties: { hold_id: { type: string }, holdnavn: { type: string }, tilmeldte: { type: integer }, max: { type: integer } } } }
+        fremmoede_pct: { type: number }
+        hestebelastning:
+          type: array
+          items:
+            type: object
+            properties:
+              hest_id: { type: string }
+              navn: { type: string }
+              lektioner_pr_dag: { type: array, items: { type: integer }, minItems: 7, maxItems: 7 }
+              max_dag: { type: integer }
+              spring_uge: { type: integer }
+        heste_ude_af_drift: { type: integer }
+        aktive_vikarkoder: { type: integer }
+        gentaget_fravaer: { type: array, items: { type: object, properties: { rytter_id: { type: string }, navn: { type: string }, i_traek: { type: integer } } } }
+        afventende_forslag: { type: integer }
+        synk_konflikter_aabne: { type: integer }
+    DashboardNotifikation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [VIKAR_LOGIN, GENTAGET_FRAVAER, SYNK_KONFLIKT, KAPACITETSMANGEL, HEST_UDE_AF_DRIFT, GENBESAETTELSESFORSLAG, PARTAFTALE_MANGLER_NIVEAUGODKENDELSE] }
+        payload: { type: object }
+        oprettet: { type: string, format: date-time }
+        kvitteret: { type: boolean }
+    RapportUdtraek:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        periode_fra: { type: string, format: date }
+        periode_til: { type: string, format: date }
+        format: { type: string, enum: [CSV, HTML] }
+        antal_raekker: { type: integer }
+        fil_sha256: { type: string }
+        kaede_hovedhash: { type: string }
+        genereret_af: { type: string }
+        genereret_tidspunkt: { type: string, format: date-time }
+        varighed_ms: { type: integer }
+    AuditHaendelse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        server_seq: { type: integer }
+        server_tidspunkt: { type: string, format: date-time }
+        klient_tidspunkt: { type: [string, 'null'], format: date-time }
+        enhed_id: { type: [string, 'null'], format: uuid }
+        bruger_navn: { type: string }
+        rolle: { $ref: '#/components/schemas/Rolle' }
+        handling: { type: string }
+        entitet: { type: string }
+        entitet_id: { type: string }
+        begrundelse: { type: [string, 'null'] }
+        hash: { type: string }
