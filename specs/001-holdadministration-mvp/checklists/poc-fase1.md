@@ -33,15 +33,15 @@
 - [x] (e) `audit_haendelse` er append-only: en UPDATE i dev-databasen gav `append-only: audit_haendelse må ikke ændres eller slettes`. UPDATE og DELETE dækkes af `append-only.spec.ts`.
 - [x] (f) Scope: kun `/admin` (Ledelse og Ridelærer). `/stald` er en pladsholder til Fase 2. Ingen forældre- eller elevadgang og intet fra F1.5/F1.6.
 
-## T104 – Pitch-scenen "Kabalen på sekunder" (manuel prøve)
+## T104 – Pitch-scenen "Kabalen på sekunder" (manuel prøve): ✅ bestået
 
-Gennemføres af teamet på localhost med seed `fredag`: `npm run db:seed -- --scenarie=fredag --nulstil` og derefter `npm run dev`. E2E-testen dækker de samme trin og er grøn (4,3 s), men erstatter ikke en prøve med en person ved tastaturet.
+Gennemført manuelt af teamet på localhost med seed `fredag` (`npm run db:seed -- --scenarie=fredag --nulstil` og derefter `npm run dev`). Hele pitch-flowet blev testet, og publiceringen lykkedes. E2E-testen dækker de samme trin og er også grøn.
 
-- [ ] Kør juli 2026, og vis varigheden og "Welfare Guard: 0 overtrædelser"
-- [ ] Vis Anna Gammelgård → Donny
-- [ ] Forsøg Emma Grønby → Pixie (grå med HC-07-tekst og ingen override)
-- [ ] Vis begrundelsen for Sophia Kronborg
-- [ ] Godkend Zigge til begyndere, kør igen, og vis færre ryttere uden hest
-- [ ] Godkend og publicér
+- [x] Kør juli 2026, og vis varigheden og "Welfare Guard: 0 overtrædelser"
+- [x] Vis Anna Gammelgård → Donny
+- [x] Forsøg Emma Grønby → Pixie (grå med HC-07-tekst og ingen override)
+- [x] Vis begrundelsen for Sophia Kronborg
+- [x] Godkend Zigge til begyndere, kør igen, og vis færre ryttere uden hest
+- [x] Godkend og publicér
 
-**Tidsforbrug**: _(udfyldes)_ · **Observationer**: _(udfyldes)_
+**Tidsforbrug**: ikke oplyst · **Observationer**: pitch-flowet blev gennemført, og publiceringen lykkedes.
