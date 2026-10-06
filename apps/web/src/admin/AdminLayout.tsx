@@ -4,6 +4,7 @@ import { api } from '../faelles/api-klient';
 import { naesteMaaned } from '../faelles/maaned';
 import { harRolle, SESSION_NOEGLE, useSession } from '../faelles/session';
 import { Knap } from '../faelles/ui/Knap';
+import { useNotifikationer } from './api/kabale';
 
 function linkStil({ isActive }: { isActive: boolean }): string {
   return `rounded px-2 py-1 ${isActive ? 'bg-emerald-100 font-semibold text-emerald-900' : 'text-stone-800 hover:bg-stone-100'}`;
@@ -15,6 +16,8 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const erLedelse = harRolle(session, 'Ledelse');
   const maaned = naesteMaaned();
+  const notifikationer = useNotifikationer(erLedelse);
+  const ukvitterede = notifikationer.data?.filter((n) => !n.kvitteret).length ?? 0;
 
   async function logUd() {
     await api('/auth/logout', { metode: 'POST' });
@@ -53,6 +56,14 @@ export function AdminLayout() {
                 <li>
                   <NavLink to="/admin/notifikationer" className={linkStil}>
                     Notifikationer
+                    {ukvitterede > 0 && (
+                      <span
+                        className="ml-1 rounded-full bg-red-700 px-2 text-sm text-white"
+                        aria-label={`${ukvitterede} ukvitterede`}
+                      >
+                        {ukvitterede}
+                      </span>
+                    )}
                   </NavLink>
                 </li>
               </>

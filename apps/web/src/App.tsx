@@ -1,18 +1,15 @@
 import { createBrowserRouter, Link, Navigate, RouterProvider } from 'react-router';
 import { AdminLayout } from './admin/AdminLayout';
+import { HesteSide } from './admin/heste/HesteSide';
+import { KabaleSide } from './admin/kabale/KabaleSide';
 import { LoginSide } from './admin/LoginSide';
+import { NotifikationerSide } from './admin/notifikationer/NotifikationerSide';
+import { OenskerSide } from './admin/oensker/OenskerSide';
+import { RytterDetaljeSide } from './admin/ryttere/RytterDetaljeSide';
+import { RyttereSide } from './admin/ryttere/RyttereSide';
+import { SikkerhedsprofilSide } from './admin/ryttere/SikkerhedsprofilSide';
 import { naesteMaaned } from './faelles/maaned';
 import { KraevRolle } from './faelles/session';
-
-// Midlertidig side for ruter, som 1.6 bygger.
-function Pladsholder({ titel }: { titel: string }) {
-  return (
-    <section>
-      <h1 className="text-2xl font-semibold">{titel}</h1>
-      <p className="mt-2 text-stone-700">Siden bygges i Fase 1, sektion 1.6.</p>
-    </section>
-  );
-}
 
 function IkkeFundet() {
   return (
@@ -37,14 +34,14 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Navigate to={`/admin/kabale/${naesteMaaned()}`} replace /> },
-      { path: 'kabale/:maaned', element: <Pladsholder titel="Kabalen" /> },
-      { path: 'oensker/:maaned', element: <Pladsholder titel="Ønsker" /> },
-      { path: 'heste', element: <Pladsholder titel="Heste" /> },
+      { path: 'kabale/:maaned', element: <KabaleSide /> },
+      { path: 'oensker/:maaned', element: <OenskerSide /> },
+      { path: 'heste', element: <HesteSide /> },
       {
         path: 'ryttere',
         element: (
           <KraevRolle roller={['Ledelse']}>
-            <Pladsholder titel="Ryttere" />
+            <RyttereSide />
           </KraevRolle>
         ),
       },
@@ -52,7 +49,7 @@ const router = createBrowserRouter([
         path: 'ryttere/:id',
         element: (
           <KraevRolle roller={['Ledelse']}>
-            <Pladsholder titel="Rytter" />
+            <RytterDetaljeSide />
           </KraevRolle>
         ),
       },
@@ -60,7 +57,7 @@ const router = createBrowserRouter([
         path: 'ryttere/:id/sikkerhed',
         element: (
           <KraevRolle roller={['Ledelse']}>
-            <Pladsholder titel="Sikkerhedsprofil" />
+            <SikkerhedsprofilSide />
           </KraevRolle>
         ),
       },
@@ -68,7 +65,7 @@ const router = createBrowserRouter([
         path: 'notifikationer',
         element: (
           <KraevRolle roller={['Ledelse']}>
-            <Pladsholder titel="Notifikationer" />
+            <NotifikationerSide />
           </KraevRolle>
         ),
       },
