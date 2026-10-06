@@ -126,6 +126,14 @@ paths:
       tags: [Auth]
       responses: { '204': { description: Logget ud } }
 
+  /auth/session:
+    get:
+      tags: [Auth]
+      summary: '[Præcisering] Aktuel session (web-admin tjekker den ved sideindlæsning)'
+      responses:
+        '200': { description: Aktiv session, content: { application/json: { schema: { $ref: '#/components/schemas/Session' } } } }
+        '401': { $ref: '#/components/responses/Fejl' }
+
   # ---------------------------------------------------------------- Stald (læsning)
   /stald/dag/{dato}:
     get:
@@ -329,6 +337,14 @@ paths:
 
   # ---------------------------------------------------------------- Tildeling (Kabalen)
   /tildeling/koersler:
+    get:
+      tags: [Tildeling]
+      summary: '[Præcisering] Kørsler for en måned uden tildelinger, nyeste først'
+      x-roller: [Ledelse, Ridelaerer]
+      parameters:
+        - { in: query, name: maaned, required: true, schema: { $ref: '#/components/schemas/Maaned' } }
+      responses:
+        '200': { content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Tildelingskoersel' } } } } }
     post:
       tags: [Tildeling]
       summary: Kør tildelingsmotoren for en måned → Kladde (eller Afvist ved Welfare Guard-fejl)
@@ -360,13 +376,26 @@ paths:
             schema: { type: object, required: [hest_id], properties: { hest_id: { type: string, format: uuid } } }
       responses:
         '200': { content: { application/json: { schema: { $ref: '#/components/schemas/Hestetildeling' } } } }
+        '409': { description: '[Præcisering] KOERSEL_IKKE_KLADDE', content: { application/json: { schema: { $ref: '#/components/schemas/Fejl' } } } }
         '422': { description: 'HC-overtrædelse – årsagskoder i Fejl.detaljer', content: { application/json: { schema: { $ref: '#/components/schemas/Fejl' } } } }
+  /tildeling/koersler/{id}/tildelinger/{tildelingId}/kandidater:
+    get:
+      tags: [Tildeling]
+      summary: '[Præcisering] Live Welfare Guard til manuel justering – alle aktive heste med lovlighed og årsag'
+      x-roller: [Ledelse, Ridelaerer]
+      parameters:
+        - $ref: '#/components/parameters/Id'
+        - { in: path, name: tildelingId, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/KandidatHest' } } } } }
   /tildeling/koersler/{id}/godkend:
     post:
       tags: [Tildeling]
       x-roller: [Ledelse, Ridelaerer]
       parameters: [ { $ref: '#/components/parameters/Id' } ]
-      responses: { '200': { description: Godkendt } }
+      responses:
+        '200': { description: Godkendt, content: { application/json: { schema: { $ref: '#/components/schemas/Tildelingskoersel' } } } }
+        '409': { description: '[Præcisering] KOERSEL_IKKE_KLADDE eller WELFARE_GUARD_FEJL', content: { application/json: { schema: { $ref: '#/components/schemas/Fejl' } } } }
   /tildeling/koersler/{id}/publicer:
     post:
       tags: [Tildeling]
@@ -374,8 +403,8 @@ paths:
       x-roller: [Ledelse]
       parameters: [ { $ref: '#/components/parameters/Id' } ]
       responses:
-        '200': { description: Publiceret }
-        '409': { description: 'IKKE_GODKENDT eller WELFARE_GUARD_FEJL' }
+        '200': { description: Publiceret, content: { application/json: { schema: { $ref: '#/components/schemas/PubliceringSvar' } } } }
+        '409': { description: 'IKKE_GODKENDT eller WELFARE_GUARD_FEJL', content: { application/json: { schema: { $ref: '#/components/schemas/Fejl' } } } }
 
   # ---------------------------------------------------------------- Lektioner (admin-varianter; stald bruger sync-kommandoer)
   /lektionspladser/{id}/erstatningsforslag:
@@ -727,6 +756,7 @@ components:
         prioritet: { type: integer, enum: [1, 2, 3] }
         oensket_hest_id: { type: string, format: uuid }
         kan_opfyldes: { type: boolean, description: 'false hvis hesten er spærret for rytteren (HC-07) – begrundelse vises kun for Ledelse' }
+        rytter_navn: { type: string, description: '[Præcisering] Fornavn + efternavn' }
 
     Tildelingskoersel:
       type: object
@@ -737,6 +767,7 @@ components:
         solver_version: { type: string }
         input_hash: { type: string }
         varighed_ms: { type: integer }
+        oprettet: { type: string, format: date-time, description: '[Præcisering] Tidspunkt for kørslen' }
         statistik:
           type: object
           properties:
@@ -761,6 +792,25 @@ components:
         begrundelse_koder: { type: array, items: { $ref: '#/components/schemas/Aarsagskode' } }
         begrundelse_tekst: { type: string }
         manuelt_justeret: { type: boolean }
+        rytter_navn: { type: string, description: '[Præcisering] Fornavn + efternavn' }
+    KandidatHest:
+      type: object
+      description: '[Præcisering] Én hest vurderet af Welfare Guard for en konkret tildeling'
+      required: [hest_id, navn, lovlig, koder, begrundelse_tekst]
+      properties:
+        hest_id: { type: string, format: uuid }
+        navn: { type: string }
+        lovlig: { type: boolean }
+        koder: { type: array, items: { $ref: '#/components/schemas/Aarsagskode' } }
+        begrundelse_tekst: { type: string }
+    PubliceringSvar:
+      type: object
+      description: '[Præcisering] Svar fra POST /tildeling/koersler/{id}/publicer'
+      required: [status, antal_lektioner, erstattet_koersel_id]
+      properties:
+        status: { type: string, enum: [Publiceret] }
+        antal_lektioner: { type: integer }
+        erstattet_koersel_id: { type: [string, 'null'], format: uuid }
 
     StaldDag:
       type: object

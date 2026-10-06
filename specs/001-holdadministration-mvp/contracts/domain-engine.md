@@ -94,6 +94,7 @@ type ErstatningsResultat = {
 | `HC08_PARTHEST_RESERVERET` | Parthest på parterens lektion | "{hest} er reserveret til sin part (HC-08)" |
 | `HC08_PART_UDEN_NIVEAUGODKENDELSE` | Parthest ikke godkendt til holdets niveau, og partaftalen er ikke markeret "godkendt trods niveau" | "{hest} er ikke godkendt til dette holds niveau, og partaftalen mangler ledelsens godkendelse (HC-08)" |
 | `LEKTION_HEST_OPTAGET` | Samme hest to gange i én lektion | "{hest} er allerede brugt på dette hold" |
+| `IKKE_GODKENDT_TIL_RYTTER` **[Præcisering]** | Hesten står ikke i pladsens forudberegnede `godkendteHeste` (bruges, hvor årsagen ikke kan eller må kendes, f.eks. på tabletten) | "{hest} er ikke godkendt til denne rytter" |
 
 ### Bløde og udfald (begrundelse)
 | Kode | Betydning |
@@ -131,3 +132,42 @@ Hver linje er en navngiven test i `packages/domain/tests/scenarier/forfatning.sp
 | F-14 | Syg hest | Udelukkes fra al tildeling og alle erstatningsforslag |
 | F-15 | To ryttere ønsker Toobi som 1. ønske | Rytteren med højest turnus får Toobi. Den anden får `SC02_TABT_TIL_TURNUS` + næste ønske |
 | F-16 | Lærke H. (part på Aida) på begynderhold, **uden** markeringen "godkendt trods niveau" | Aida tildeles ikke. Lærke får en alternativ, begyndergodkendt hest med `HC08_PART_UDEN_NIVEAUGODKENDELSE`, og der oprettes en `PARTAFTALE_MANGLER_NIVEAUGODKENDELSE`-notifikation. **Med** markering tildeles Aida, hvis HC-01–HC-07 er opfyldt |
+
+## 6. Præciseringer til implementeringen (2026-10-06)
+
+Beslutninger, som Fase 1-motoren (`mrv-greedy@1`) bygger på. De udfylder huller i kontrakten ovenfor og ændrer ingen hårde regler.
+
+**(a) Input- og plantyper**
+
+```ts
+type AllokeringsInput = {
+  maaned: Maaned;                                   // 'YYYY-MM'
+  heste: HestData[];
+  hold: HoldData[];
+  ryttere: RytterRegelData[];
+  tilmeldinger: { id: Id; rytterId: Id; holdId: Id; ancienitetDato: LocalDate }[];
+  oensker: { rytterId: Id; prioritet: 1 | 2 | 3; hestId: HestId }[];
+  turnus: Record<Id, number>;                        // rytter-id → prioritet fra måneden før (0 hvis ukendt)
+};
+type Maanedsplan = { maaned: Maaned; tildelinger: { holdtilmeldingId: Id; hestId: HestId | null }[] };
+type Stamdata = Omit<AllokeringsInput, 'oensker' | 'turnus'>;
+type Overtraedelse = { holdtilmeldingId: Id; hestId: HestId; kode: Aarsagskode };
+```
+
+En månedsplan er en ugeskabelon: en rytter har samme hest på sit hold hver uge i måneden. Dagsbelastning tælles pr. hest pr. ugedag, springhold pr. hest pr. uge.
+
+**(b) Kvalificerede koder.** En årsagskode kan bære hestens id som `KODE:<hestId>` (f.eks. `HC01_DAGSGRAENSE:<Toobis id>`). `forklar()` slår navnet op i konteksten.
+
+**(c) `IKKE_GODKENDT_TIL_RYTTER`** returneres af `validerPlacering`, når hesten ikke står i `godkendteHeste`. På serveren bruges i stedet de præcise statiske koder fra `beregnEgnethed`.
+
+**(d) HC-08's niveaukrav** gælder kun `Begynder` (`godkendt_til_begyndere`) og `Oevet` (`egnet_oevet`). `Traekhold`, `Letoevet` og `Parthold` har intet niveaukrav. Kilde: `_resources/teacher/_case-01-Casebeskrivelse, BPMN.md` om Trækhold: "Næsten alle heste kan bruges her".
+
+**(e) Rækkefølge (R5 trin 3).** Ryttere placeres i MRV-grupper: gruppe 1 = højst 3 egnede heste, gruppe 2 = 4–6, gruppe 3 = 7 eller flere. Inden for en gruppe sorteres på turnus (faldende), ancienitet (ældst først) og tilmeldings-id. Hjælpere (`er_hjaelper`) behandles efter alle andre (SC-05). Grupperne sikrer, at turnus (SC-02, F-15) faktisk får betydning, mens de mest begrænsede ryttere stadig placeres først.
+
+**(f) Score (R5 trin 4).** `score = SC-01 (1./2./3. ønske = 100/60/30, ellers 0) − 10 × hestens antal tildelinger i ugeskabelonen indtil nu (SC-03) + 15, hvis rytteren er klar_til_udvikling og hesten ikke er Rolig (SC-04)`. Uafgjort afgøres af laveste ugebelastning og derefter hest-id.
+
+**(g) Reparation (R5 trin 5)** har dybde 1: højst én anden rytter flyttes til en anden lovlig hest. Faste tildelinger (påkrævet hest, partaftale) flyttes aldrig.
+
+**(h) Turnus.** `IKKE_TILDELT_KAPACITET` giver `turnus_naeste_maaned = +3` ligesom en alternativ tildeling. Faste tildelinger (partaftale, påkrævet hest) giver 0. Ryttere uden registrerede ønsker får 0.
+
+**(i) Publicering.** En ny publicering for en måned sætter den tidligere `Publiceret`-kørsel til `Forkastet`, så der højst er én `Publiceret` pr. måned.

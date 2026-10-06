@@ -1,0 +1,23 @@
+{
+  "name": "@ridecenter/domain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ren TypeScript uden I/O: Welfare Guard (HC-01 – HC-08), tildelingsmotor og forretningsregler. Kører på både server og tablet.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --exclude \"tests/property/**\"",
+    "test:property": "vitest run tests/property",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@date-fns/tz": "^1.5.0",
+    "date-fns": "^4.4.0"
+  },
+  "devDependencies": {
+    "fast-check": "^4.10.2",
+    "vitest": "^5.0.3"
+  }
+}

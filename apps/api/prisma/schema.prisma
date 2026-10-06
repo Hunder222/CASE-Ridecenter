@@ -1,0 +1,424 @@
+// Datamodel for POC'en (specs/001-holdadministration-mvp/data-model.md).
+// Feltnavne er snake_case og identiske med data-model.md og openapi.yaml.
+// CHECK-regler, partielle unikke indeks og append-only-triggere ligger i den håndskrevne
+// del af migrationen (prisma/migrations/*_init/migration.sql), da Prisma ikke kan udtrykke dem.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- 1. Personale
+
+enum Rolle {
+  Ledelse
+  Ridelaerer
+  Vikar
+  Staldelev
+}
+
+model Bruger {
+  id            String  @id @default(uuid()) @db.Uuid
+  navn          String
+  /// Mindst 1. En bruger kan have flere roller (Malene: Ledelse + Ridelærer).
+  roller        Rolle[]
+  /// Argon2id af 4-cifret PIN. Påkrævet for staldroller; udfyldes i Fase 2.
+  pin_hash      String?
+  /// Kun til web-login (Ledelse/Ridelærer).
+  email         String? @unique
+  password_hash String?
+  /// Inaktive brugere kan ikke logge ind. Historik bevares.
+  aktiv         Boolean @default(true)
+
+  fast_hold                Hold[]
+  lektioner                Lektion[]
+  oensker_registreret      Elevoenske[]
+  koersler_startet         Tildelingskoersel[]
+  profiler_opdateret       Sikkerhedsprofil[]
+  notifikationer_kvitteret DashboardNotifikation[]
+  audit_haendelser         AuditHaendelse[]
+
+  @@map("bruger")
+}
+
+// ---------------------------------------------------------------- 2. Heste
+
+enum Temperament {
+  Rolig
+  Normal
+  Frisk
+}
+
+enum Sundhedsstatus {
+  Aktiv
+  Sygemeldt
+  Skadet
+  Karantaene
+}
+
+model Hest {
+  id                     String         @id @default(uuid()) @db.Uuid
+  /// Unik blandt aktive heste (partielt indeks i migrationen).
+  navn                   String
+  /// 80–190.
+  stangmaal_cm           Int
+  /// HC-06. Demoværdi afledt af stangmål, skal valideres af Malene.
+  max_rytter_vaegt_kg    Int
+  /// HC-06. null = ingen højdegrænse.
+  max_rytter_hoejde_cm   Int?
+  temperament            Temperament
+  /// HC-08. Kun Ledelse kan ændre feltet (auditlogges).
+  godkendt_til_begyndere Boolean        @default(false)
+  egnet_oevet            Boolean        @default(true)
+  /// HC-02.
+  skaane                 Boolean        @default(false)
+  /// Afledt: skaane ? 2 : 3. Må ikke overstige afledt værdi.
+  max_lektioner_dag      Int
+  /// HC-05.
+  springforbud           Boolean        @default(false)
+  /// {0,1}. springforbud ⇒ 0, ellers 1.
+  max_spring_uge         Int
+  /// HC-03. ISO-ugedag 1–7. Ingen hold på denne ugedag.
+  hviledag               Int
+  /// HC-04. Kun Aktiv kan tildeles.
+  sundhedsstatus         Sundhedsstatus @default(Aktiv)
+  /// Ikke-følsomme håndteringsnoter, der må vises i stalden.
+  staldnoter             String         @default("")
+  /// Solgte heste deaktiveres, historikken bevares.
+  aktiv                  Boolean        @default(true)
+
+  partryttere       Rytter[]
+  oensker           Elevoenske[]
+  tildelinger       Hestetildeling[]
+  planlagte_pladser LektionsPlads[]  @relation("PlanlagtHest")
+  aktuelle_pladser  LektionsPlads[]  @relation("AktuelHest")
+
+  @@map("hest")
+}
+
+// ---------------------------------------------------------------- 3. Ryttere og følsomme data (to adskilte tabeller, Princip IV)
+
+enum Erfaringsniveau {
+  Begynder
+  Letoevet
+  Oevet
+}
+
+enum AktivStatus {
+  Aktiv
+  Pauseret
+  Opsagt
+}
+
+model Rytter {
+  id                               String          @id @default(uuid()) @db.Uuid
+  fornavn                          String
+  efternavn                        String
+  /// Tilskudskriterium. Ingen CPR.
+  foedselsdato                     DateTime        @db.Date
+  bopaelskommune                   String
+  /// HC-06. Synlig kun for Ledelse. Sendes aldrig til enheder.
+  hoejde_cm                        Int
+  vaegt_kg                         Int
+  erfaringsniveau                  Erfaringsniveau
+  /// SC-04.
+  klar_til_udvikling               Boolean         @default(false)
+  /// SC-05.
+  er_hjaelper                      Boolean         @default(false)
+  kontaktperson_navn               String
+  kontakt_telefon                  String
+  kontakt_email                    String
+  /// HC-08.
+  partaftale_hest_id               String?         @db.Uuid
+  /// HC-08. Kun Ledelse kan sætte feltet (auditlogges).
+  partaftale_godkendt_trods_niveau Boolean         @default(false)
+  aktiv_status                     AktivStatus     @default(Aktiv)
+  /// FR-015 (logik i Fase 2).
+  opsigelse_modtaget               DateTime?       @db.Date
+  slutdato                         DateTime?       @db.Date
+
+  partaftale_hest  Hest?             @relation(fields: [partaftale_hest_id], references: [id])
+  sikkerhedsprofil Sikkerhedsprofil?
+  tilmeldinger     Holdtilmelding[]
+  oensker          Elevoenske[]
+  pladser          LektionsPlads[]
+
+  @@map("rytter")
+}
+
+/// GDPR art. 9. Kun Ledelse kan læse og skrive den fulde profil.
+/// cheat_sheet_koder og adfaerdsinstruks tilføjes i Fase 2 (US3, FR-012).
+model Sikkerhedsprofil {
+  rytter_id         String   @id @db.Uuid
+  /// 🔒 Krypteret (AES-256-GCM, format v1:<iv>:<tag>:<data>).
+  faldtraume_note   String?
+  /// 🔒 Krypteret.
+  angstkategori     String?
+  /// 🔒 Krypteret.
+  intern_note       String?
+  /// HC-07. Kun motor og Ledelse.
+  forbudte_heste    String[] @default([]) @db.Uuid
+  /// HC-07. Kun motor og Ledelse.
+  paakraevede_heste String[] @default([]) @db.Uuid
+  /// HC-07. Nervøse ryttere: ikke friske heste.
+  kun_rolige_heste  Boolean  @default(false)
+  opdateret_af      String   @db.Uuid
+  opdateret         DateTime @db.Timestamptz(6)
+
+  rytter              Rytter @relation(fields: [rytter_id], references: [id])
+  opdateret_af_bruger Bruger @relation(fields: [opdateret_af], references: [id])
+
+  @@map("sikkerhedsprofil")
+}
+
+// ---------------------------------------------------------------- 4. Hold, tilmeldinger og ønsker
+
+enum Niveau {
+  Traekhold
+  Begynder
+  Letoevet
+  Oevet
+  Parthold
+}
+
+model Hold {
+  id                 String  @id @default(uuid()) @db.Uuid
+  holdnavn           String
+  /// HC-08.
+  niveau             Niveau
+  /// HC-05.
+  er_springhold      Boolean @default(false)
+  /// 1–7 (ISO-ugedag).
+  ugedag             Int
+  /// HH:MM (data-model: time; tekst giver enkel mapning til openapi).
+  starttid           String  @db.VarChar(5)
+  /// 30–60.
+  varighed_min       Int
+  /// 1–10 (casen: max 10).
+  max_kapacitet      Int
+  fast_underviser_id String  @db.Uuid
+
+  fast_underviser Bruger           @relation(fields: [fast_underviser_id], references: [id])
+  tilmeldinger    Holdtilmelding[]
+  lektioner       Lektion[]
+
+  @@map("hold")
+}
+
+model Holdtilmelding {
+  id              String    @id @default(uuid()) @db.Uuid
+  rytter_id       String    @db.Uuid
+  hold_id         String    @db.Uuid
+  gyldig_fra      DateTime  @db.Date
+  /// gyldig_til ≤ Rytter.slutdato ved opsigelse.
+  gyldig_til      DateTime? @db.Date
+  /// Tie-breaker i motoren.
+  ancienitet_dato DateTime  @db.Date
+
+  rytter      Rytter           @relation(fields: [rytter_id], references: [id])
+  hold        Hold             @relation(fields: [hold_id], references: [id])
+  tildelinger Hestetildeling[]
+
+  @@unique([rytter_id, hold_id, gyldig_fra])
+  @@map("holdtilmelding")
+}
+
+/// F1.1. Ønsker på spærrede heste accepteres, men vises som "kan ikke opfyldes".
+model Elevoenske {
+  id              String   @id @default(uuid()) @db.Uuid
+  rytter_id       String   @db.Uuid
+  /// YYYY-MM.
+  maaned          String   @db.Char(7)
+  /// {1,2,3}.
+  prioritet       Int
+  oensket_hest_id String   @db.Uuid
+  registreret_af  String   @db.Uuid
+  oprettet        DateTime @default(now()) @db.Timestamptz(6)
+
+  rytter                Rytter @relation(fields: [rytter_id], references: [id])
+  oensket_hest          Hest   @relation(fields: [oensket_hest_id], references: [id])
+  registreret_af_bruger Bruger @relation(fields: [registreret_af], references: [id])
+
+  @@unique([rytter_id, maaned, prioritet])
+  @@unique([rytter_id, maaned, oensket_hest_id])
+  @@map("elevoenske")
+}
+
+// ---------------------------------------------------------------- 5. Månedlig tildeling (Kabalen)
+
+enum KoerselStatus {
+  Kladde
+  Afvist
+  Godkendt
+  Publiceret
+  Forkastet
+}
+
+model Tildelingskoersel {
+  id                     String        @id @default(uuid()) @db.Uuid
+  /// YYYY-MM. Højst én Publiceret kørsel pr. måned (partielt indeks).
+  maaned                 String        @db.Char(7)
+  status                 KoerselStatus
+  startet_af             String        @db.Uuid
+  /// F.eks. mrv-greedy@1.
+  solver_version         String
+  /// SHA-256 af input. Samme input giver samme output (determinisme).
+  input_hash             String
+  /// Måles mod SC-004.
+  varighed_ms            Int
+  statistik              Json
+  /// Skal være tom for at kunne godkendes.
+  welfare_guard_resultat Json
+  oprettet               DateTime      @default(now()) @db.Timestamptz(6)
+
+  startet_af_bruger Bruger           @relation(fields: [startet_af], references: [id])
+  tildelinger       Hestetildeling[]
+
+  @@index([maaned])
+  @@map("tildelingskoersel")
+}
+
+model Hestetildeling {
+  id                      String   @id @default(uuid()) @db.Uuid
+  koersel_id              String   @db.Uuid
+  holdtilmelding_id       String   @db.Uuid
+  /// null = Ikke tildelt – kapacitetsmangel.
+  hest_id                 String?  @db.Uuid
+  /// {1,2,3}.
+  oenske_opfyldt          Int?
+  /// true når ingen ønsker kunne opfyldes (US2 AS4).
+  er_alternativ_tildeling Boolean
+  turnus_score            Int
+  /// 0/+1/+2/+3.
+  turnus_naeste_maaned    Int
+  /// Årsagskoder, evt. kvalificeret som KODE:<hest_id>.
+  begrundelse_koder       String[] @default([])
+  /// Dansk forklaring (FR-010).
+  begrundelse_tekst       String
+  /// Justeringen skal bestå Welfare Guard.
+  manuelt_justeret        Boolean  @default(false)
+
+  koersel        Tildelingskoersel @relation(fields: [koersel_id], references: [id])
+  holdtilmelding Holdtilmelding    @relation(fields: [holdtilmelding_id], references: [id])
+  hest           Hest?             @relation(fields: [hest_id], references: [id])
+
+  @@unique([koersel_id, holdtilmelding_id])
+  @@map("hestetildeling")
+}
+
+// ---------------------------------------------------------------- 6. Daglig afvikling
+
+enum LektionStatus {
+  Planlagt
+  Afviklet
+  Aflyst
+}
+
+enum PladsKilde {
+  Plan
+  Venteliste
+  Hjaelper
+}
+
+model Lektion {
+  id               String        @id @default(uuid()) @db.Uuid
+  hold_id          String        @db.Uuid
+  /// dato.ugedag = Hold.ugedag (håndhæves ved publicering).
+  dato             DateTime      @db.Date
+  /// Fast underviser eller vikar.
+  underviser_id    String        @db.Uuid
+  vikar_navn       String?
+  status           LektionStatus @default(Planlagt)
+  /// Bruges i Fase 2 (åbent/lukket fremmøde).
+  fremmoede_lukket DateTime?     @db.Timestamptz(6)
+
+  hold       Hold            @relation(fields: [hold_id], references: [id])
+  underviser Bruger          @relation(fields: [underviser_id], references: [id])
+  pladser    LektionsPlads[]
+
+  @@unique([hold_id, dato])
+  @@map("lektion")
+}
+
+model LektionsPlads {
+  id                String     @id @default(uuid()) @db.Uuid
+  lektion_id        String     @db.Uuid
+  rytter_id         String     @db.Uuid
+  /// Fra Hestetildeling.
+  planlagt_hest_id  String?    @db.Uuid
+  /// Felt-LWW ved sync. Unik pr. lektion (partielt indeks).
+  aktuel_hest_id    String?    @db.Uuid
+  kilde             PladsKilde @default(Plan)
+  /// {aktuel_hest_id: klient_ts} til LWW.
+  felt_tidsstempler Json       @default("{}")
+
+  lektion       Lektion @relation(fields: [lektion_id], references: [id])
+  rytter        Rytter  @relation(fields: [rytter_id], references: [id])
+  planlagt_hest Hest?   @relation("PlanlagtHest", fields: [planlagt_hest_id], references: [id])
+  aktuel_hest   Hest?   @relation("AktuelHest", fields: [aktuel_hest_id], references: [id])
+
+  @@unique([lektion_id, rytter_id])
+  @@map("lektionsplads")
+}
+
+// ---------------------------------------------------------------- 8. Ledelse og revision
+
+enum NotifikationType {
+  VIKAR_LOGIN
+  GENTAGET_FRAVAER
+  SYNK_KONFLIKT
+  KAPACITETSMANGEL
+  HEST_UDE_AF_DRIFT
+  GENBESAETTELSESFORSLAG
+  PARTAFTALE_MANGLER_NIVEAUGODKENDELSE
+}
+
+model DashboardNotifikation {
+  id                  String           @id @default(uuid()) @db.Uuid
+  type                NotifikationType
+  payload             Json
+  oprettet            DateTime         @default(now()) @db.Timestamptz(6)
+  kvitteret_af        String?          @db.Uuid
+  kvitteret_tidspunkt DateTime?        @db.Timestamptz(6)
+  /// [Præcisering] Forhindrer dubletter af ukvitterede notifikationer (partielt indeks).
+  dedupe_noegle       String?
+
+  kvitteret_af_bruger Bruger? @relation(fields: [kvitteret_af], references: [id])
+
+  @@map("dashboard_notifikation")
+}
+
+/// 🧾 Append-only (trigger i migrationen) og ⛓ hashkæde (R11).
+model AuditHaendelse {
+  /// Sættes i koden, så hashen kan beregnes før indsættelse.
+  id               String    @id @db.Uuid
+  /// Rækkefølge i hashkæden.
+  server_seq       BigInt    @unique @default(autoincrement())
+  server_tidspunkt DateTime  @db.Timestamptz(6)
+  klient_tidspunkt DateTime? @db.Timestamptz(6)
+  /// FK til Enhed tilføjes i Fase 2.
+  enhed_id         String?   @db.Uuid
+  bruger_id        String?   @db.Uuid
+  bruger_navn      String
+  rolle            String
+  handling         String
+  entitet          String
+  entitet_id       String
+  /// Krypterede felter logges aldrig i klartekst, kun som "ændret".
+  foer             Json?
+  efter            Json?
+  begrundelse      String?
+  kommando_id      String?   @db.Uuid
+  forrige_hash     String
+  hash             String
+
+  bruger Bruger? @relation(fields: [bruger_id], references: [id])
+
+  @@index([handling])
+  @@index([entitet_id])
+  @@map("audit_haendelse")
+}

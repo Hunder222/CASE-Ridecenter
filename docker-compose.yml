@@ -1,0 +1,23 @@
+name: ridecenter
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ridecenter
+      POSTGRES_PASSWORD: ridecenter
+      POSTGRES_DB: ridecenter
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Køres kun første gang volumen initialiseres (opretter testdatabasen)
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ridecenter -d ridecenter']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

@@ -1,0 +1,16 @@
+node_modules
+dist
+build
+coverage
+package-lock.json
+apps/api/prisma/migrations
+playwright-report
+test-results
+
+# Dokumentation og spec-kit formateres i hånden
+*.md
+.agents
+.claude
+.specify
+_resources
+specs

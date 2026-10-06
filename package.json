@@ -1,0 +1,42 @@
+{
+  "name": "boegegaarden-holdadministration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Bøgegårdens Ridecenter – Digital Holdadministration & Ressourcestyring (POC)",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,magenta \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "test": "npm run test --workspaces --if-present",
+    "test:property": "npm run test:property -w packages/domain",
+    "bench:kabale": "tsx tools/bench/kabale.ts",
+    "test:e2e": "playwright test",
+    "db:migrate": "npm run db:migrate -w apps/api",
+    "db:deploy": "npm run db:deploy -w apps/api",
+    "db:seed": "tsx tools/seed/index.ts",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p tools --noEmit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.19.1",
+    "concurrently": "^10.0.5",
+    "dotenv": "^18.0.5",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.1",
+    "uuid": "^14.0.2"
+  }
+}

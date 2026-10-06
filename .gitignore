@@ -1,0 +1,28 @@
+# Afhængigheder
+node_modules/
+
+# Byg og output
+dist/
+build/
+coverage/
+*.log
+*.tsbuildinfo
+
+# Miljø og hemmeligheder (kun .env.example committes)
+.env
+.env.*
+!.env.example
+
+# Test
+playwright-report/
+test-results/
+blob-report/
+tools/bench/resultat-*.json
+
+# OS og editor
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/
