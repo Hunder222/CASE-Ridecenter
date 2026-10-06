@@ -1,5 +1,5 @@
 import type { Hestetildeling, PubliceringSvar } from '@ridecenter/contracts';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { forskydMaaned, maanedNavn, naesteMaaned } from '../../faelles/maaned';
 import { harRolle, useSession } from '../../faelles/session';
@@ -34,6 +34,13 @@ export function KabaleSide() {
   const [bekraefter, setBekraefter] = useState(false);
   const [publiceret, setPubliceret] = useState<PubliceringSvar | null>(null);
   const hesteNavne = useMemo(() => new Map((heste.data ?? []).map((h) => [h.id, h.navn])), [heste.data]);
+  const begrundelseRef = useRef<HTMLElement>(null);
+
+  /** Klik på en række: vis begrundelsen (T097). Panelet rulles ind, hvis det ligger uden for skærmen. */
+  function visBegrundelse(tildelingId: string) {
+    setValgtTildelingId(tildelingId);
+    begrundelseRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
 
   const k = koersel.data;
   const valgt = k?.tildelinger?.find((t) => t.id === valgtTildelingId);
@@ -100,11 +107,11 @@ export function KabaleSide() {
               hold={hold.data ?? []}
               hesteNavne={hesteNavne}
               valgtId={valgtTildelingId}
-              onVaelg={setValgtTildelingId}
+              onVaelg={visBegrundelse}
               onJuster={k.status === 'Kladde' ? setJusterer : undefined}
             />
           </div>
-          <BegrundelsePanel tildeling={valgt} hesteNavne={hesteNavne} />
+          <BegrundelsePanel ref={begrundelseRef} tildeling={valgt} hesteNavne={hesteNavne} />
         </div>
       )}
 

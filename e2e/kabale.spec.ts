@@ -71,6 +71,15 @@ test('V2: Kabalen for juli – kør, forklar, justér uden override, godkend og 
     await expect(panel).toContainText('Sophia Kronborg');
     await expect(panel).toContainText(/SC0[1-5]_[A-Z_0-9]+|HC0[1-8]_[A-Z_]+|ALT_TILDELING/);
     await expect(panel).toContainText(/ønske|turnus|hold/i);
+    // Klik på rækken viser begrundelsen, hvor brugeren kigger, og åbner ikke justeringsdialogen.
+    await expect(panel).toBeInViewport();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    // Også for en rytter på det sidste hold langt nede på siden (T097).
+    await raekke(page, 'Victoria Skovby').click();
+    await expect(panel).toContainText('Victoria Skovby');
+    await expect(panel).toBeInViewport();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
   });
 
   await test.step('Alternativ tildeling viser turnus +3 næste måned (US2 AS4)', async () => {
