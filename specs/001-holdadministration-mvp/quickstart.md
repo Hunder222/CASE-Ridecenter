@@ -3,7 +3,22 @@
 **Formål**: beskriver hvordan POC'en startes, og hvordan det **demonstreres og verificeres**, at hver user story og hvert succeskriterium (SC-001 – SC-009) er opfyldt. Guiden bruges også som drejebog til pitchen for Bøgegårdens Ridecenter.
 **Referencer**: [plan.md](./plan.md) · [data-model.md](./data-model.md) · [contracts/](./contracts/) · [research.md](./research.md)
 
-> Kommandoerne er **målkommandoer**, som implementeringen (tasks) skal levere. De findes ikke endnu.
+> Kommandoerne er **målkommandoer** for hele POC'en. Fase 1 (Kabalen) er bygget, se afsnit 0. Resten leveres i Fase 2.
+
+## 0. Fase 1 – PoC af Kabalen (status 2026-10-06)
+
+Fase 1 leverer User Story 2 som en komplet vertikal skive. Kun web-admin under `/admin` findes. Staldfladen (`/stald`, PIN, offline og sync) kommer i Fase 2, så V1 og V3 – V10 kan endnu ikke køres.
+
+| Kommando | Status |
+|---|---|
+| `npm run dev` | ✅ API på :3000 og web på :5173 (`/admin`) |
+| `npm run db:seed -- --scenarie=fredag --nulstil` (eller `fuld`) | ✅ |
+| `npm test` | ✅ domæne, API og web inkl. F-01 – F-16 |
+| `npm run test:property` | ✅ fast-check, 200 kørsler pr. egenskab |
+| `npm run bench:kabale` | ✅ seed "fuld", median ca. 6 ms |
+| `npm run test:e2e -- e2e/kabale.spec.ts` | ✅ V2. Kræver `npx playwright install chromium` én gang og nulstiller dev-databasen |
+
+Login i Fase 1 sker med e-mail og adgangskode: `malene@demo.dk` (Ledelse) eller `marie@demo.dk` (Ridelærer) med `SEED_ADGANGSKODE` fra `.env`. PIN-koderne og vikarkoderne i afsnit 2 hører til Fase 2. Resultaterne af valideringen står i [checklists/poc-fase1.md](./checklists/poc-fase1.md).
 
 ## 1. Forudsætninger
 
@@ -55,13 +70,13 @@ Hvert scenarie kan køres manuelt (demo) og findes som Playwright-test (`e2e/<fi
 
 ### V2 – Kabalen for juli (US2, SC-002, SC-003, SC-004) · `e2e/kabale.spec.ts`
 1. `/admin/kabale/2026-07` → "Kør tildeling". **Forventet**: kladde på under 30 sek. Varighed vises. `Welfare Guard: 0 overtrædelser`.
-2. Stikprøve på forfatningseksemplerne: Anna → Donny. Emma ≠ Pixie. Sofia ≠ Aida. Freja P. → Belle. Lærke H. → Aida. Ingen Bølle, Wally eller Aida på springhold.
+2. Stikprøve på forfatningseksemplerne: Anna → Donny. Emma ≠ Pixie. Sofia ≠ Aida. Freja P. → Belle. Lærke H. → Aida, men først når partaftalen er markeret "godkendt trods niveau" (trin 7, F-16). Uden markeringen får hun en begyndergodkendt hest eller ingen. Ingen Bølle, Wally eller Aida på springhold.
 3. Klik på Sophia Kronborgs tildeling. **Forventet**: en begrundelse med kode og dansk tekst (FR-010), f.eks. turnus eller dagsgrænse.
 4. Find en rytter markeret **"Alternativ tildeling (ønsker optaget)"**. **Forventet**: begrundelse + `turnus næste måned: +3` (US2 AS4).
 5. Prøv manuelt at give Emma Grønby hesten Pixie. **Forventet**: Pixie er grå med "Ikke tilladt af hensyn til rytterens sikkerhed (HC-07)" og kan ikke vælges. Der findes ingen "override"-knap (Princip I).
 6. Hvis begynderholdene har flere ryttere end begyndervenlige heste (research D2). **Forventet**: `IKKE_TILDELT_KAPACITET` + notifikation, aldrig en ulovlig hest. Lad Malene godkende f.eks. Zigge til begyndere under `/admin/heste` og kør igen. Kapacitetsmanglen falder.
 7. Lærke H. uden markeringen "godkendt trods niveau". **Forventet**: alternativ hest + advarsel på dashboardet (F-16). Sæt markeringen og kør igen: Lærke får Aida.
-8. Godkend → Publicér. **Forventet**: stald-tablet viser de nye heste efter sync eller SSE.
+8. Godkend → Publicér. **Forventet**: stald-tablet viser de nye heste efter sync eller SSE. *(Fase 1: siden viser "Publiceret – N lektioner oprettet". Stald-tabletten verificeres i Fase 2.)*
 
 ### V3 – Syg hest og top-3 erstatning offline (US3 AS3–AS5, SC-005) · `e2e/erstatning.spec.ts`
 1. Log ind som staldelev (`3333`) og meld **Toobi → Helbred → "Kan ikke bruges"** ("halter").

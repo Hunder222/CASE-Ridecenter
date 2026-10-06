@@ -123,3 +123,34 @@ I overensstemmelse med [`_resources/team/feature_prioritization.md`]:
 │   └── teacher/                      # Oprindeligt casemateriale og historiske data
 └── README.md                         # Dette dokument
 ```
+
+---
+
+## 🚀 8. Kom i gang (Fase 1 PoC)
+
+Fase 1 er en PoC af **Kabalen** (User Story 2): web-admin under `/admin`, hvor ledelsen og ridelærerne kører den månedlige hestetildeling, ser en dansk begrundelse for hver tildeling, justerer under live Welfare Guard (uden override), godkender og publicerer. Staldfladen (tablet, offline, PIN) kommer i Fase 2.
+
+**Forudsætninger**: Node.js 24 og Docker Desktop (PostgreSQL 17).
+
+```bash
+npm install                                     # alle workspaces
+cp .env.example .env                            # udfyld nøgler og adgangskoder (se kommentarerne i filen)
+docker compose up -d db                         # PostgreSQL 17 (dev- og testdatabase)
+npm run db:migrate                              # Prisma-migrationer inkl. append-only-trigger
+npm run db:seed -- --scenarie=fredag --nulstil  # casens fredag: 4 hold, 34 ryttere, 20 heste
+npm run dev                                     # API på :3000 og web på :5173
+```
+
+Åbn `http://localhost:5173/admin`, og log ind som **Malene** (`malene@demo.dk`, Ledelse) eller **Marie** (`marie@demo.dk`, Ridelærer) med adgangskoden fra `SEED_ADGANGSKODE` i `.env`. Vælg *Kabale* og juli 2026.
+
+**Bevis** (alle grønne pr. 2026-10-06):
+
+```bash
+npm test                          # domæne, API og web (Vitest) inkl. forfatningsscenarierne F-01 – F-16
+npm run test:property             # fast-check: motoren overholder altid Welfare Guard
+npm run bench:kabale              # seed "fuld": 180 ryttere / 29 hold / 22 heste på ca. 6 ms (krav under 30 sek.)
+npx playwright install chromium   # én gang
+npm run test:e2e                  # Playwright: hele Kabale-flowet (nulstiller dev-databasen til seed fredag)
+```
+
+Opgaver og status: [specs/001-holdadministration-mvp/tasks.md](specs/001-holdadministration-mvp/tasks.md). Valideringsresultater: [specs/001-holdadministration-mvp/checklists/poc-fase1.md](specs/001-holdadministration-mvp/checklists/poc-fase1.md).
