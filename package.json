@@ -20,6 +20,8 @@
     "db:migrate": "npm run db:migrate -w apps/api",
     "db:deploy": "npm run db:deploy -w apps/api",
     "db:seed": "tsx tools/seed/index.ts",
+    "demo:tid": "tsx tools/demo/tid.ts",
+    "demo:manipuler": "tsx tools/demo/manipuler.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p tools --noEmit"

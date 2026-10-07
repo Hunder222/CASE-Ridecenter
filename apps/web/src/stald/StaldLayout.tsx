@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Outlet, useNavigate } from 'react-router';
+import { Outlet, useLocation, useNavigate } from 'react-router';
 import type { SynkTilstand } from '@ridecenter/contracts';
 import { SynkIndikator } from '../faelles/ui/SynkIndikator';
 import { db } from '../offline/dexie-db';
@@ -13,17 +13,28 @@ export const StaldLayout: React.FC = () => {
   const [ventendeAntal, setVentendeAntal] = useState<number>(0);
   const [advarsler, setAdvarsler] = useState<string[]>([]);
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Hent aktiv session
+  const erHoldSide =
+    location.pathname === '/stald' ||
+    location.pathname.startsWith('/stald/i-dag') ||
+    location.pathname.startsWith('/stald/hold') ||
+    location.pathname.startsWith('/stald/lektion');
+  const erOenskerSide = location.pathname.startsWith('/stald/oensker');
+  const erHesteSide = location.pathname.startsWith('/stald/heste');
+
+  // Hent aktiv session og afvis uautoriseret adgang
   useEffect(() => {
     const hentSession = async () => {
       const sessionPost = await db.meta.get('aktiv_session');
       if (sessionPost?.vaerdi?.navn) {
         setBrugerNavn(sessionPost.vaerdi.navn);
+      } else {
+        navigate('/stald/laas', { replace: true });
       }
     };
     hentSession();
-  }, []);
+  }, [navigate]);
 
   // Lyt til sync-motor
   useEffect(() => {
@@ -83,18 +94,45 @@ export const StaldLayout: React.FC = () => {
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
+            onClick={() => navigate('/stald/i-dag')}
+            className={`px-3 py-1.5 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-1.5 cursor-pointer ${
+              erHoldSide
+                ? 'bg-sky-600 text-white border-sky-400 shadow-md shadow-sky-950/50'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+            }`}
+          >
+            📅 Dagens hold
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/stald/oensker')}
+            className={`px-3 py-1.5 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-1.5 cursor-pointer ${
+              erOenskerSide
+                ? 'bg-sky-600 text-white border-sky-400 shadow-md shadow-sky-950/50'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+            }`}
+          >
+            ⭐ Elevønsker
+          </button>
+          <button
+            type="button"
             onClick={() => navigate('/stald/heste')}
-            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs sm:text-sm font-medium text-slate-200 border border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
+            className={`px-3 py-1.5 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-1.5 cursor-pointer ${
+              erHesteSide
+                ? 'bg-sky-600 text-white border-sky-400 shadow-md shadow-sky-950/50'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+            }`}
           >
             🐎 Heste
           </button>
-          <span className="text-sm font-medium text-slate-300 hidden md:inline">
+          <span className="text-sm font-medium text-slate-300 hidden md:inline ml-1">
             {brugerNavn}
           </span>
           <button
             type="button"
             onClick={laasSkærm}
-            className="px-4 py-2 min-h-[44px] rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-sm font-medium text-slate-200 border border-slate-700 transition flex items-center gap-2 cursor-pointer"
+            className="px-3.5 py-1.5 min-h-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-xs sm:text-sm font-medium text-slate-300 border border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
+            title="Lås tablet"
           >
             🔒 Lås
           </button>

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { db, type LokalHest } from '../offline/dexie-db';
 import { gemHestStatusMelding } from '../offline/omplacering-sync';
 
 export const HesteOversigtSide: React.FC = () => {
+  const navigate = useNavigate();
   const [heste, setHeste] = useState<LokalHest[]>([]);
   const [valgtHest, setValgtHest] = useState<LokalHest | null>(null);
   const [type, setType] = useState<'Helbred' | 'Adfaerd'>('Helbred');
@@ -123,11 +125,21 @@ export const HesteOversigtSide: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Staldens Heste</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Overblik over hestenes sundhedstilstand og hurtig registrering af helbred/adfærd (fail-safe).
-          </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/stald/i-dag')}
+            className="min-h-[48px] px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-650 text-slate-200 font-semibold border border-slate-700 flex items-center gap-2 cursor-pointer transition shadow-sm"
+          >
+            <span>←</span>
+            <span>Dagens hold</span>
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-white">Staldens Heste</h1>
+            <p className="text-sm text-slate-400 mt-0.5">
+              Overblik over hestenes sundhedstilstand og hurtig registrering af helbred/adfærd (fail-safe).
+            </p>
+          </div>
         </div>
       </div>
 

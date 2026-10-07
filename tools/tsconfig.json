@@ -1,7 +1,7 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node", "@fastify/cookie"]
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "../apps/api/src/fastify-typer.d.ts"]
 }

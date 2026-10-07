@@ -140,6 +140,7 @@ const router = createBrowserRouter([
       { path: 'lektion/:id', element: <LektionSide /> },
       { path: 'lektion/:id/cheat-sheet', element: <CheatSheetSide /> },
       { path: 'plads/:id/erstat', element: <ErstatHestSide /> },
+      { path: 'oensker', element: <OenskerLektionSide /> },
       { path: 'oensker/:lektionId', element: <OenskerLektionSide /> },
     ],
   },

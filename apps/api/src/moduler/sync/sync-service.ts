@@ -544,7 +544,23 @@ export class SyncService {
     nu: Date,
   ): Promise<KommandoResultat> {
     const payload = k.payload as RegistrerOenskerPayload;
-    const registreretAfId = k.bruger_id ?? '00000000-0000-0000-0000-000000000000';
+
+    // Sikr gyldig bruger reference (Foreign Key)
+    let registreretAfId: string | null = k.bruger_id;
+    if (registreretAfId) {
+      const fundet = await this.prisma.bruger.findUnique({
+        where: { id: registreretAfId },
+        select: { id: true },
+      });
+      if (!fundet) registreretAfId = null;
+    }
+    if (!registreretAfId) {
+      const fallbackBruger = await this.prisma.bruger.findFirst({
+        where: { aktiv: true },
+        select: { id: true },
+      });
+      registreretAfId = fallbackBruger?.id ?? null;
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.elevoenske.deleteMany({
@@ -554,18 +570,20 @@ export class SyncService {
         },
       });
 
-      let prio = 1;
-      for (const hestId of payload.hest_ids) {
-        await tx.elevoenske.create({
-          data: {
-            rytter_id: payload.rytter_id,
-            maaned: payload.maaned,
-            prioritet: prio++,
-            oensket_hest_id: hestId,
-            registreret_af: registreretAfId,
-            oprettet: nu,
-          },
-        });
+      if (registreretAfId && payload.hest_ids && payload.hest_ids.length > 0) {
+        let prio = 1;
+        for (const hestId of payload.hest_ids) {
+          await tx.elevoenske.create({
+            data: {
+              rytter_id: payload.rytter_id,
+              maaned: payload.maaned,
+              prioritet: prio++,
+              oensket_hest_id: hestId,
+              registreret_af: registreretAfId,
+              oprettet: nu,
+            },
+          });
+        }
       }
     });
 

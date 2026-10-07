@@ -8,6 +8,7 @@ export interface SeedBruger {
   roller: ('Ledelse' | 'Ridelaerer' | 'Vikar' | 'Staldelev')[];
   /** Kun brugere med e-mail får web-login (adgangskode = SEED_ADGANGSKODE). */
   email: string | null;
+  pin?: string;
 }
 
 export interface SeedHest extends HestData {

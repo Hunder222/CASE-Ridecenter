@@ -45,6 +45,8 @@ export interface LokalHest {
   stangmaal_cm?: number;
   sundhedsstatus: string;
   temperament?: string;
+  godkendt_til_begyndere?: boolean;
+  egnet_oevet?: boolean;
   staldnoter?: string;
   hviledag?: number;
   max_lektioner_dag?: number;

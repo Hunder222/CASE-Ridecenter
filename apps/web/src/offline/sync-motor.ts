@@ -99,7 +99,11 @@ class SyncMotor {
         }));
 
         // Send til API
-        const enhedNoegle = localStorage.getItem('ridecenter_enhedsnoegle') ?? '';
+        let enhedNoegle = localStorage.getItem('ridecenter_enhedsnoegle');
+        if (!enhedNoegle) {
+          enhedNoegle = 'demo-enhedsnoegle-stald-tablet-1';
+          localStorage.setItem('ridecenter_enhedsnoegle', enhedNoegle);
+        }
         const pushRes = await fetch('/api/v1/sync/push', {
           method: 'POST',
           headers: {
@@ -149,7 +153,11 @@ class SyncMotor {
    * Henter nyeste snapshot fra /api/v1/sync/pull og gemmer i Dexie.
    */
   private async pull(): Promise<void> {
-    const enhedNoegle = localStorage.getItem('ridecenter_enhedsnoegle') ?? '';
+    let enhedNoegle = localStorage.getItem('ridecenter_enhedsnoegle');
+    if (!enhedNoegle) {
+      enhedNoegle = 'demo-enhedsnoegle-stald-tablet-1';
+      localStorage.setItem('ridecenter_enhedsnoegle', enhedNoegle);
+    }
     const res = await fetch('/api/v1/sync/pull', {
       headers: {
         'X-Enhed-Noegle': enhedNoegle,

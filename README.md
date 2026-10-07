@@ -126,31 +126,46 @@ I overensstemmelse med [`_resources/team/feature_prioritization.md`]:
 
 ---
 
-## 🚀 8. Kom i gang (Fase 1 PoC)
+## 🚀 8. Kom i gang (Komplet POC: Fase 1 & Fase 2)
 
-Fase 1 er en PoC af **Kabalen** (User Story 2): web-admin under `/admin`, hvor ledelsen og ridelærerne kører den månedlige hestetildeling, ser en dansk begrundelse for hver tildeling, justerer under live Welfare Guard (uden override), godkender og publicerer. Staldfladen (tablet, offline, PIN) kommer i Fase 2.
+Systemet er nu en komplet fungerende Proof-of-Concept (POC), der omfatter:
+- **Staldflade (PWA) under `/stald`:** Touch-optimeret til tablets, 4-cifret PIN-login, batch-fremmøde offline på under 10 sekunder, lektionsvisning og akut top-3 hesteerstatning.
+- **Vikaradgang & Digitalt Cheat Sheet:** Hurtig vikar-adgang med 6-cifret engangskode uden kendskab til personfølsomme diagnoser (GDPR Art. 9).
+- **Web-Admin under `/admin`:** Den automatiske hestekabale (mrv-greedy@1), live Welfare Guard uden override, venteliste-genbesættelse ved afbud før kl. 12:00, kapacitets-heatmaps og 1-klik kommunale tilsynsrapporter med kryptografisk hashkædeverifikation.
 
 **Forudsætninger**: Node.js 24 og Docker Desktop (PostgreSQL 17).
 
 ```bash
 npm install                                     # alle workspaces
-cp .env.example .env                            # udfyld nøgler og adgangskoder (se kommentarerne i filen)
+cp .env.example .env                            # udfyld nøgler og adgangskoder
 docker compose up -d db                         # PostgreSQL 17 (dev- og testdatabase)
-npm run db:migrate                              # Prisma-migrationer inkl. append-only-trigger
-npm run db:seed -- --scenarie=fredag --nulstil  # casens fredag: 4 hold, 34 ryttere, 20 heste
+npm run db:migrate                              # Prisma-migrationer inkl. append-only-triggere
+npm run db:seed -- --scenarie=fredag --nulstil  # casens data inkl. PIN-koder og lektioner
 npm run dev                                     # API på :3000 og web på :5173
 ```
 
-Åbn `http://localhost:5173/admin`, og log ind som **Malene** (`malene@demo.dk`, Ledelse) eller **Marie** (`marie@demo.dk`, Ridelærer) med adgangskoden fra `SEED_ADGANGSKODE` i `.env`. Vælg *Kabale* og juli 2026.
+### Adgang & Testbrugere
+- **Web-Admin (`http://localhost:5173/admin`):**
+  - **Malene (Ledelse):** `malene@demo.dk` (adgangskode fra `SEED_ADGANGSKODE` i `.env`)
+  - **Marie (Ridelærer):** `marie@demo.dk`
+- **Staldflade (`http://localhost:5173/stald`):**
+  - **PIN-login:** Malene: `1111`, Marie: `2222`, Camilla: `2223`, Birgit: `2224`, Staldelev (Ella J.): `3333`
+  - **Vikaradgang:** Vælg "Jeg er vikar" og brug en af de seedede 6-cifrede koder: `123456`, `654321` eller `888999`.
 
-**Bevis** (alle grønne pr. 2026-10-06):
+### Kørsel på tablet over lokalt netværk / HTTPS
+For at køre staldfladen på en fysisk iPad eller tablet på samme netværk:
+- Start webapplikationen med host-eksponering eller brug en lokal HTTPS-proxy (f.eks. Caddy eller `mkcert`), da PWA og Service Worker kræver sikker kontekst.
+- Åbn `https://<lokal-ip>:5173/stald` og tilføj til hjemmeskærmen for fuld PWA offline-oplevelse.
 
+### Automatiseret bevisførelse og demo-værktøjer
 ```bash
-npm test                          # domæne, API og web (Vitest) inkl. forfatningsscenarierne F-01 – F-16
-npm run test:property             # fast-check: motoren overholder altid Welfare Guard
-npm run bench:kabale              # seed "fuld": 180 ryttere / 29 hold / 22 heste på ca. 6 ms (krav under 30 sek.)
-npx playwright install chromium   # én gang
-npm run test:e2e                  # Playwright: hele Kabale-flowet (nulstiller dev-databasen til seed fredag)
+npm test -w packages/domain       # 210 domænetests inkl. forfatningsscenarier F-01 – F-16
+npm run test:property             # fast-check invariant-test af Welfare Guard (200 inputs)
+npm run bench:kabale              # Månedskabale benchmark (180 ryttere / 29 hold / 22 heste): median 7,8 ms
+npm run demo:tid                  # Virtuelt ur til simulering af kl. 12:00 afbudsfrist
+npm run demo:manipuler            # Beviser append-only trigger afvisning og audit-hashkædetjek
+npm run typecheck                 # 100% statisk typekontrol på tværs af hele monorepoet
 ```
 
-Opgaver og status: [specs/001-holdadministration-mvp/tasks.md](specs/001-holdadministration-mvp/tasks.md). Valideringsresultater: [specs/001-holdadministration-mvp/checklists/poc-fase1.md](specs/001-holdadministration-mvp/checklists/poc-fase1.md).
+Opgaver og opgavestatus: [specs/001-holdadministration-mvp/tasks.md](specs/001-holdadministration-mvp/tasks.md).  
+Valideringsrapport for Fase 2: [specs/001-holdadministration-mvp/checklists/fase2-validering.md](specs/001-holdadministration-mvp/checklists/fase2-validering.md).

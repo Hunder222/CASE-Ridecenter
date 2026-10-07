@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { erFremmoedeAabent } from '@ridecenter/domain';
 import { db, type LokalHest, type LokalLektion, type LokalPlads } from '../offline/dexie-db';
 
 interface HoldKortData {
@@ -13,25 +12,79 @@ interface HoldKortData {
   erLukket: boolean;
 }
 
+function justerDato(datoStr: string, dage: number): string {
+  const parts = datoStr.split('-').map(Number);
+  const aar = parts[0] ?? 2026;
+  const md = parts[1] ?? 1;
+  const dag = parts[2] ?? 1;
+  const d = new Date(aar, md - 1, dag + dage);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function formaterDatoDansk(datoStr: string): string {
+  try {
+    const parts = datoStr.split('-').map(Number);
+    const aar = parts[0] ?? 2026;
+    const md = parts[1] ?? 1;
+    const dag = parts[2] ?? 1;
+    const d = new Date(aar, md - 1, dag);
+    const ugedag = d.toLocaleDateString('da-DK', { weekday: 'long' });
+    const dagMaanedAar = d.toLocaleDateString('da-DK', { day: 'numeric', month: 'long', year: 'numeric' });
+    return `${ugedag.charAt(0).toUpperCase() + ugedag.slice(1)} d. ${dagMaanedAar}`;
+  } catch {
+    return datoStr;
+  }
+}
+
 export function IDagSide() {
   const navigate = useNavigate();
+  const iDagStr = new Date().toISOString().slice(0, 10);
+  const [valgtDato, setValgtDato] = useState<string>(iDagStr);
   const [holdData, setHoldData] = useState<HoldKortData[]>([]);
   const [indlaeser, setIndlaeser] = useState(true);
 
-  const hentDagensData = async () => {
+  const hentData = async (datoStr: string, tvingServer = false) => {
+    setIndlaeser(true);
     try {
-      const iDagStr = new Date().toISOString().slice(0, 10);
-      let lektioner = await db.lektioner.where('dato').equals(iDagStr).toArray();
+      let lektioner = await db.lektioner.where('dato').equals(datoStr).toArray();
       let allePladser = await db.pladser.toArray();
       let alleHeste = await db.heste.toArray();
 
-      // Hvis tomt i Dexie, forsøg at hente fra serveren (/api/v1/stald/dag/:dato)
-      if (lektioner.length === 0) {
+      // Sikr heste i Dexie
+      if (alleHeste.length === 0) {
         try {
-          const res = await fetch(`/api/v1/stald/dag/${iDagStr}`);
+          const hesteRes = await fetch('/api/v1/heste');
+          if (hesteRes.ok) {
+            const hesteData = await hesteRes.json();
+            const lokHeste: LokalHest[] = hesteData.map((h: any) => ({
+              id: h.id,
+              navn: h.navn,
+              stangmaal_cm: h.stangmaal_cm,
+              sundhedsstatus: h.sundhedsstatus,
+              temperament: h.temperament,
+              staldnoter: h.staldnoter ?? '',
+              hviledag: h.hviledag,
+              max_lektioner_dag: h.max_lektioner_dag,
+            }));
+            await db.heste.bulkPut(lokHeste);
+            alleHeste = lokHeste;
+          }
+        } catch {}
+      }
+
+      // Hent fra serveren hvis tomt lokalt eller tvingServer er sand
+      if (lektioner.length === 0 || tvingServer) {
+        try {
+          const enhedNoegle = localStorage.getItem('ridecenter_enhedsnoegle') ?? 'demo-enhedsnoegle-stald-tablet-1';
+          const res = await fetch(`/api/v1/stald/dag/${datoStr}`, {
+            headers: {
+              'X-Enhed-Noegle': enhedNoegle,
+            },
+          });
           if (res.ok) {
             const data = await res.json();
-            if (data.lektioner && data.lektioner.length > 0) {
+            if (data.lektioner) {
               const nyLektioner: LokalLektion[] = [];
               const nyPladser: LokalPlads[] = [];
 
@@ -63,15 +116,16 @@ export function IDagSide() {
                 }
               }
 
-              await db.lektioner.bulkPut(nyLektioner);
-              await db.pladser.bulkPut(nyPladser);
-
-              lektioner = nyLektioner;
-              allePladser = nyPladser;
+              if (nyLektioner.length > 0) {
+                await db.lektioner.bulkPut(nyLektioner);
+                await db.pladser.bulkPut(nyPladser);
+                lektioner = nyLektioner;
+                allePladser = await db.pladser.toArray();
+              }
             }
           }
         } catch {
-          // offline, fortsæt med lokale data
+          // offline, fortsæt med eksisterende Dexie-data
         }
       }
 
@@ -104,16 +158,8 @@ export function IDagSide() {
             }
           }
 
-          const erLukket = Boolean(
-            l.fremmoedeLukket ||
-              !erFremmoedeAabent({
-                starttid: l.starttid,
-                varighedMin: 60,
-                dato: l.dato,
-                lukketTidspunkt: null,
-                nu: new Date(),
-              })
-          );
+          // Lektionen er kun lukket, hvis der eksplicit er trykket "Afslut hold"
+          const erLukket = Boolean(l.fremmoedeLukket);
 
           return {
             lektion: l,
@@ -128,40 +174,113 @@ export function IDagSide() {
 
       setHoldData(kort);
     } catch (err) {
-      console.error('Fejl ved indlæsning af dagens hold:', err);
+      console.error('Fejl ved indlæsning af hold for dato:', err);
     } finally {
       setIndlaeser(false);
     }
   };
 
   useEffect(() => {
-    hentDagensData();
-  }, []);
+    hentData(valgtDato);
+  }, [valgtDato]);
+
+  const erIDag = valgtDato === iDagStr;
 
   return (
     <div className="max-w-4xl mx-auto p-4 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Dagens lektioner</h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Vælg et hold for hurtig afkrydsning og hestetildeling
-          </p>
+      {/* Dato navigation bar */}
+      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 shadow-lg flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-start">
+          <button
+            type="button"
+            onClick={() => setValgtDato((d) => justerDato(d, -1))}
+            className="min-h-[44px] px-3.5 rounded-xl bg-slate-800 hover:bg-slate-750 active:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-sm flex items-center gap-1.5 transition cursor-pointer"
+            title="Gå til forrige dag"
+          >
+            <span>←</span>
+            <span className="hidden sm:inline">Forrige dag</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setValgtDato(iDagStr)}
+            className={`min-h-[44px] px-4 rounded-xl font-semibold text-sm border transition cursor-pointer ${
+              erIDag
+                ? 'bg-sky-600 text-white border-sky-400 shadow-md'
+                : 'bg-slate-800 hover:bg-slate-750 text-slate-300 border-slate-700'
+            }`}
+          >
+            I dag
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setValgtDato((d) => justerDato(d, 1))}
+            className="min-h-[44px] px-3.5 rounded-xl bg-slate-800 hover:bg-slate-750 active:bg-slate-700 text-slate-200 border border-slate-700 font-medium text-sm flex items-center gap-1.5 transition cursor-pointer"
+            title="Gå til næste dag"
+          >
+            <span className="hidden sm:inline">Næste dag</span>
+            <span>→</span>
+          </button>
         </div>
-        <button
-          onClick={hentDagensData}
-          className="min-h-[44px] px-3.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 text-sm font-medium"
-        >
-          Opdater
-        </button>
+
+        <div className="text-center">
+          <div className="text-lg sm:text-xl font-bold text-white">
+            {formaterDatoDansk(valgtDato)}
+          </div>
+          {erIDag && (
+            <div className="text-xs text-sky-400 font-medium mt-0.5">Dagens program</div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          <input
+            type="date"
+            value={valgtDato}
+            onChange={(e) => {
+              if (e.target.value) setValgtDato(e.target.value);
+            }}
+            className="min-h-[44px] px-3 py-2 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+            title="Vælg dato"
+          />
+          <button
+            type="button"
+            onClick={() => hentData(valgtDato, true)}
+            className="min-h-[44px] px-3.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 text-sm font-medium transition cursor-pointer"
+            title="Genindlæs data fra serveren"
+          >
+            🔄 Opdater
+          </button>
+        </div>
       </div>
 
       {indlaeser ? (
         <div className="flex h-48 items-center justify-center">
-          <div className="text-slate-400 font-medium animate-pulse">Indlæser dagens hold...</div>
+          <div className="text-slate-400 font-medium animate-pulse">Indlæser lektioner...</div>
         </div>
       ) : holdData.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-700 p-12 text-center">
-          <p className="text-slate-400 text-base">Ingen lektioner planlagt for i dag.</p>
+        <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center bg-slate-900/40">
+          <p className="text-slate-400 text-base">
+            Ingen lektioner planlagt for {formaterDatoDansk(valgtDato)}.
+          </p>
+          <div className="mt-4 flex justify-center gap-3">
+            {!erIDag && (
+              <button
+                type="button"
+                onClick={() => setValgtDato(iDagStr)}
+                className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm transition"
+              >
+                Gå til i dag
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => hentData(valgtDato, true)}
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm border border-slate-700 transition"
+            >
+              Prøv at hente fra server
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -179,7 +298,7 @@ export function IDagSide() {
                 key={lektion.id}
                 type="button"
                 onClick={() => navigate(`/stald/lektion/${lektion.id}`)}
-                className="w-full text-left rounded-2xl bg-slate-900 border border-slate-800 hover:border-sky-500/50 hover:bg-slate-850 p-5 shadow-lg transition-all active:scale-[0.99] flex flex-col justify-between gap-4 group"
+                className="w-full text-left rounded-2xl bg-slate-900 border border-slate-800 hover:border-sky-500/50 hover:bg-slate-850 p-5 shadow-lg transition-all active:scale-[0.99] flex flex-col justify-between gap-4 group cursor-pointer"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
@@ -190,18 +309,18 @@ export function IDagSide() {
                       {harAdvarsel && (
                         <span
                           title={advarselTekst}
-                          className="px-2 py-0.5 rounded text-xs bg-amber-950/90 text-amber-300 border border-amber-800 flex items-center gap-1 font-medium"
+                          className="px-2.5 py-1 rounded-full text-xs bg-amber-950/90 text-amber-300 border border-amber-800 flex items-center gap-1 font-semibold"
                         >
-                          <span>⚠</span> Advarsel
+                          <span>⚠️</span> Advarsel
                         </span>
                       )}
                       {erLukket ? (
-                        <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-400 border border-slate-700">
-                          Afsluttet
+                        <span className="px-2.5 py-1 rounded-full text-xs bg-slate-800 text-slate-400 border border-slate-700 font-medium">
+                          🔒 Afsluttet
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded text-xs bg-emerald-950/80 text-emerald-300 border border-emerald-800">
-                          Åbent
+                        <span className="px-2.5 py-1 rounded-full text-xs bg-emerald-950/80 text-emerald-300 border border-emerald-800 font-semibold">
+                          ✓ Åbent
                         </span>
                       )}
                     </div>
@@ -248,4 +367,3 @@ export function IDagSide() {
     </div>
   );
 }
-

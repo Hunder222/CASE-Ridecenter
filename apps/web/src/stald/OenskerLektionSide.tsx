@@ -1,19 +1,58 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { db, type LokalHest, type LokalLektion, type LokalPlads } from '../offline/dexie-db';
 import { syncMotor } from '../offline/sync-motor';
 
+interface ElevMatrixData {
+  rytterId: string;
+  rytterNavnKort: string;
+  niveau: string;
+  holdnavn: string;
+  godkendteHeste: string[];
+  oensker: string[]; // hest_id'er (prioritet 1, 2, 3)
+}
+
+function normaliserNiveau(niveau: string): string {
+  if (niveau.toLowerCase().includes('begynder')) return 'Begynder';
+  if (niveau.toLowerCase().includes('letoevet') || niveau.toLowerCase().includes('letøvet')) return 'Letøvet';
+  if (niveau.toLowerCase().includes('oevet') || niveau.toLowerCase().includes('øvet')) return 'Øvet';
+  return niveau;
+}
+
+function evaluerHestEgnethed(
+  hest: LokalHest,
+  elev: ElevMatrixData
+): { egnet: boolean; aarsag?: string } {
+  if (elev.niveau === 'Begynder' && !hest.godkendt_til_begyndere) {
+    return { egnet: false, aarsag: 'Ikke godkendt til begyndere' };
+  }
+  if (elev.niveau === 'Øvet' && hest.egnet_oevet === false) {
+    return { egnet: false, aarsag: 'Ikke egnet til øvede' };
+  }
+  if (elev.godkendteHeste && elev.godkendteHeste.length > 0 && !elev.godkendteHeste.includes(hest.id)) {
+    return { egnet: false, aarsag: 'Ikke godkendt til rytterens fysiologi' };
+  }
+  return { egnet: true };
+}
+
 export function OenskerLektionSide() {
-  const { lektionId } = useParams<{ lektionId: string }>();
+  const { lektionId } = useParams<{ lektionId?: string }>();
   const navigate = useNavigate();
 
-  const [lektion, setLektion] = useState<LokalLektion | null>(null);
-  const [pladser, setPladser] = useState<LokalPlads[]>([]);
+  const [elever, setElever] = useState<ElevMatrixData[]>([]);
   const [heste, setHeste] = useState<LokalHest[]>([]);
-  const [valgtPladsId, setValgtPladsId] = useState<string | null>(null);
-  const [oensker, setOensker] = useState<string[]>([]); // hest_id'er
-  const [gemtStatus, setGemtStatus] = useState<string | null>(null);
+  const [hesteMap, setHesteMap] = useState<Map<string, LokalHest>>(new Map());
   const [indlaeser, setIndlaeser] = useState(true);
+
+  // Filter & Søgning
+  const [filterNiveau, setFilterNiveau] = useState<string>('Alle');
+  const [filterStatus, setFilterStatus] = useState<'Alle' | 'Mangler' | 'Klar'>('Alle');
+  const [soeg, setSoeg] = useState<string>('');
+
+  // Aktiv elev der redigeres i modal
+  const [redigerElev, setRedigerElev] = useState<ElevMatrixData | null>(null);
+  const [valgteOensker, setValgteOensker] = useState<string[]>([]);
+  const [gemtStatus, setGemtStatus] = useState<string | null>(null);
 
   // Måneden der ønskes for (næste måned YYYY-MM)
   const naesteMaanedStr = (() => {
@@ -24,57 +63,190 @@ export function OenskerLektionSide() {
     return `${y}-${m}`;
   })();
 
-  useEffect(() => {
-    async function indlaes() {
-      if (!lektionId) return;
-      try {
-        const l = await db.lektioner.get(lektionId);
-        const p = await db.pladser.where('lektionId').equals(lektionId).toArray();
-        const h = await db.heste.toArray();
-
-        if (l) setLektion(l);
-        setPladser(p);
-        setHeste(h.filter((hest) => hest.sundhedsstatus === 'Aktiv'));
-
-        if (p.length > 0 && !valgtPladsId && p[0]) {
-          setValgtPladsId(p[0].id);
-        }
-      } catch (err) {
-        console.error('Fejl ved indlæsning af stald-ønsker:', err);
-      } finally {
-        setIndlaeser(false);
+  const indlaesAlt = async () => {
+    setIndlaeser(true);
+    try {
+      // 1. Hent heste
+      let h = await db.heste.toArray();
+      if (h.length === 0 || h.some((hest) => hest.godkendt_til_begyndere === undefined)) {
+        try {
+          const hRes = await fetch('/api/v1/heste');
+          if (hRes.ok) {
+            const hData = await hRes.json();
+            h = hData.map((x: any) => ({
+              id: x.id,
+              navn: x.navn,
+              stangmaal_cm: x.stangmaal_cm,
+              sundhedsstatus: x.sundhedsstatus,
+              temperament: x.temperament,
+              godkendt_til_begyndere: x.godkendt_til_begyndere ?? x.godkendtTilBegyndere ?? false,
+              egnet_oevet: x.egnet_oevet ?? x.egnetOevet ?? true,
+              staldnoter: x.staldnoter ?? '',
+              hviledag: x.hviledag,
+              max_lektioner_dag: x.max_lektioner_dag,
+            }));
+            await db.heste.bulkPut(h);
+          }
+        } catch {}
       }
+      setHeste(h.filter((hest) => hest.sundhedsstatus === 'Aktiv'));
+      setHesteMap(new Map(h.map((x) => [x.id, x])));
+
+      // 2. Hent lektioner & pladser
+      let lektioner = await db.lektioner.toArray();
+      let pladser = await db.pladser.toArray();
+
+      // Hvis tomt eller mangler rytternavne, indlæs fra serveren
+      if (pladser.length === 0 || pladser.some((p) => !p.rytterNavnKort)) {
+        const iDagStr = new Date().toISOString().slice(0, 10);
+        const enhedNoegle = localStorage.getItem('ridecenter_enhedsnoegle') ?? 'demo-enhedsnoegle-stald-tablet-1';
+        try {
+          const res = await fetch(`/api/v1/stald/dag/${iDagStr}`, {
+            headers: { 'X-Enhed-Noegle': enhedNoegle },
+          });
+          if (res.ok) {
+            const dagData = await res.json();
+            if (dagData.lektioner) {
+              const nyL = dagData.lektioner.map((l: any) => ({
+                id: l.id,
+                dato: l.dato,
+                holdId: l.hold_id,
+                holdnavn: l.holdnavn,
+                starttid: l.starttid,
+                niveau: l.niveau,
+                erSpringhold: l.er_springhold,
+                fremmoedeLukket: l.fremmoede_lukket,
+              }));
+              const nyP: LokalPlads[] = [];
+              for (const l of dagData.lektioner) {
+                for (const pl of l.pladser ?? []) {
+                  nyP.push({
+                    id: pl.id,
+                    lektionId: l.id,
+                    rytterId: pl.id,
+                    rytterNavnKort: pl.rytter_navn_kort,
+                    aktuelHestId: pl.aktuel_hest_id,
+                    planlagtHestId: pl.planlagt_hest_id,
+                    status: pl.afledt_status,
+                    godkendteHeste: pl.godkendte_heste,
+                    cheatSheetKoder: pl.cheat_sheet_koder,
+                    adfaerdsinstruks: pl.adfaerdsinstruks,
+                  });
+                }
+              }
+              await db.lektioner.bulkPut(nyL);
+              await db.pladser.bulkPut(nyP);
+              lektioner = nyL;
+              pladser = nyP;
+            }
+          }
+        } catch {}
+      }
+
+      // 3. Hent eksisterende ønsker for næste måned
+      const oenskerMap = new Map<string, string[]>();
+
+      // Fra serveren
+      try {
+        const res = await fetch(`/api/v1/stald/oensker/${naesteMaanedStr}`);
+        if (res.ok) {
+          const data: Array<{ rytter_id: string; prioritet: number; oensket_hest_id: string }> = await res.json();
+          for (const o of data) {
+            const eks = oenskerMap.get(o.rytter_id) ?? [];
+            eks[o.prioritet - 1] = o.oensket_hest_id;
+            oenskerMap.set(o.rytter_id, eks);
+          }
+        }
+      } catch {}
+
+      // Fra Dexie outbox
+      try {
+        const outbox = await db.outbox.where('type').equals('RegistrerOensker').toArray();
+        for (const post of outbox) {
+          if (post.payload?.maaned === naesteMaanedStr && post.payload.rytter_id) {
+            oenskerMap.set(post.payload.rytter_id, post.payload.hest_ids ?? []);
+          }
+        }
+      } catch {}
+
+      // 4. Byg matrixliste pr. unik rytter
+      const lektionMap = new Map(lektioner.map((l) => [l.id, l]));
+      const ryttereMap = new Map<string, ElevMatrixData>();
+
+      for (const p of pladser) {
+        if (ryttereMap.has(p.rytterId)) continue;
+        const l = lektionMap.get(p.lektionId);
+        const råNiveau = l?.niveau ?? 'Letoevet';
+        const niveau = normaliserNiveau(råNiveau);
+        const holdnavn = l?.holdnavn ?? 'Hold';
+        const oensker = (oenskerMap.get(p.rytterId) ?? []).filter(Boolean);
+
+        ryttereMap.set(p.rytterId, {
+          rytterId: p.rytterId,
+          rytterNavnKort: p.rytterNavnKort ?? 'Rytter',
+          niveau,
+          holdnavn,
+          godkendteHeste: p.godkendteHeste ?? [],
+          oensker,
+        });
+      }
+
+      const liste = Array.from(ryttereMap.values()).sort((a, b) =>
+        a.rytterNavnKort.localeCompare(b.rytterNavnKort, 'da')
+      );
+      setElever(liste);
+    } catch (err) {
+      console.error('Fejl ved indlæsning af elevønsker:', err);
+    } finally {
+      setIndlaeser(false);
     }
-    indlaes();
+  };
+
+  useEffect(() => {
+    indlaesAlt();
   }, [lektionId]);
 
-  const valgtPlads = pladser.find((p) => p.id === valgtPladsId);
+  // Åbn redigering af en elev
+  const aabnRedigering = (elev: ElevMatrixData) => {
+    setRedigerElev(elev);
+    setValgteOensker([...elev.oensker]);
+    setGemtStatus(null);
+  };
 
-  // Filtrér heste til kun de heste, der er godkendt til rytteren (R6)
-  const tilgaengeligeHeste = heste.filter((h) => {
-    if (!valgtPlads?.godkendteHeste || valgtPlads.godkendteHeste.length === 0) {
-      return true;
+  // Gruppering af heste for den elev, der redigeres i modal
+  const { egnedeHeste, ikkeEgnedeHeste } = useMemo(() => {
+    if (!redigerElev) return { egnedeHeste: [], ikkeEgnedeHeste: [] };
+    const egnede: Array<{ hest: LokalHest }> = [];
+    const ikkeEgnede: Array<{ hest: LokalHest; aarsag?: string }> = [];
+
+    for (const h of heste) {
+      const res = evaluerHestEgnethed(h, redigerElev);
+      if (res.egnet) {
+        egnede.push({ hest: h });
+      } else {
+        ikkeEgnede.push({ hest: h, aarsag: res.aarsag });
+      }
     }
-    return valgtPlads.godkendteHeste.includes(h.id);
-  });
+
+    egnede.sort((a, b) => a.hest.navn.localeCompare(b.hest.navn, 'da'));
+    ikkeEgnede.sort((a, b) => a.hest.navn.localeCompare(b.hest.navn, 'da'));
+
+    return { egnedeHeste: egnede, ikkeEgnedeHeste: ikkeEgnede };
+  }, [heste, redigerElev]);
 
   const toggleHestOenske = (hestId: string) => {
-    setGemtStatus(null);
-    if (oensker.includes(hestId)) {
-      setOensker(oensker.filter((id) => id !== hestId));
+    if (valgteOensker.includes(hestId)) {
+      setValgteOensker(valgteOensker.filter((id) => id !== hestId));
     } else {
-      if (oensker.length >= 3) {
-        // Erstat 3. ønske eller roter
-        setOensker([...oensker.slice(0, 2), hestId]);
+      if (valgteOensker.length >= 3) {
+        setValgteOensker([...valgteOensker.slice(0, 2), hestId]);
       } else {
-        setOensker([...oensker, hestId]);
+        setValgteOensker([...valgteOensker, hestId]);
       }
     }
   };
 
-  const haandterGemOensker = async () => {
-    if (!valgtPlads || oensker.length === 0) return;
-
+  const gemOenskerForElev = async (elev: ElevMatrixData, nyeOensker: string[]) => {
     const kommandoId = crypto.randomUUID();
     const klientTidspunkt = new Date().toISOString();
     const brugerStr = localStorage.getItem('ridecenter_bruger');
@@ -82,146 +254,590 @@ export function OenskerLektionSide() {
     if (brugerStr) {
       try {
         brugerId = JSON.parse(brugerStr).id;
-      } catch {
-        // ignore
-      }
+      } catch {}
+    }
+    if (!brugerId) {
+      const foersteBruger = await db.brugere.toCollection().first();
+      brugerId = foersteBruger?.id ?? null;
     }
 
-    // Gem i Dexie outbox
+    // 1. Gem i Dexie outbox
     await db.outbox.add({
       kommandoId,
       type: 'RegistrerOensker',
       klientTidspunkt,
       brugerId,
       payload: {
-        rytter_id: valgtPlads.rytterId,
+        rytter_id: elev.rytterId,
         maaned: naesteMaanedStr,
-        hest_ids: oensker,
+        hest_ids: nyeOensker,
       },
       sendtStatus: 'afventer',
     });
 
+    // 2. Opdatér lokal matrix-state med det samme (feltet skifter straks farve)
+    setElever((prev) =>
+      prev.map((e) => (e.rytterId === elev.rytterId ? { ...e, oensker: [...nyeOensker] } : e))
+    );
+
     syncMotor.planlaegSync();
 
-    setGemtStatus(`Ønsker gemt for ${valgtPlads.rytterNavnKort ?? 'rytter'} til ${naesteMaanedStr}!`);
-    setTimeout(() => setGemtStatus(null), 3000);
+    // Forsøg også direkte API batch gem
+    try {
+      await fetch('/api/v1/oensker/stald/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rytter_id: elev.rytterId,
+          maaned: naesteMaanedStr,
+          oensker: nyeOensker.map((hestId, index) => ({
+            oensket_hest_id: hestId,
+            prioritet: index + 1,
+          })),
+        }),
+      });
+    } catch {}
+
+    const besked =
+      nyeOensker.length === 0
+        ? `✓ Ønsker ryddet for ${elev.rytterNavnKort}!`
+        : `✓ ${nyeOensker.length} af 3 ønsker gemt for ${elev.rytterNavnKort}!`;
+    setGemtStatus(besked);
+    setTimeout(() => {
+      setGemtStatus(null);
+      setRedigerElev(null);
+    }, 1200);
   };
+
+  const haandterGemOensker = async () => {
+    if (!redigerElev) return;
+    await gemOenskerForElev(redigerElev, valgteOensker);
+  };
+
+  const haandterRydOensker = async () => {
+    if (!redigerElev) return;
+    setValgteOensker([]);
+    await gemOenskerForElev(redigerElev, []);
+  };
+
+  // Filtrering af elever til matrixen
+  const filtreredeElever = elever.filter((e) => {
+    if (filterNiveau !== 'Alle' && e.niveau !== filterNiveau) return false;
+    if (filterStatus === 'Mangler' && e.oensker.length === 3) return false;
+    if (filterStatus === 'Klar' && e.oensker.length < 3) return false;
+    if (soeg.trim() && !e.rytterNavnKort.toLowerCase().includes(soeg.toLowerCase())) return false;
+    return true;
+  });
+
+  // Gruppér elever pr. niveau
+  const niveauer = ['Begynder', 'Letøvet', 'Øvet'];
+  const eleverPrNiveau = niveauer.map((niv) => ({
+    niveau: niv,
+    elever: filtreredeElever.filter((e) => e.niveau === niv),
+  }));
+
+  // Tilføj eventuelle øvrige niveauer hvis de findes
+  const oevrigeNiveauer = Array.from(new Set(filtreredeElever.map((e) => e.niveau))).filter(
+    (niv) => !niveauer.includes(niv)
+  );
+  for (const niv of oevrigeNiveauer) {
+    eleverPrNiveau.push({
+      niveau: niv,
+      elever: filtreredeElever.filter((e) => e.niveau === niv),
+    });
+  }
+
+  // Statistik
+  const totalElever = elever.length;
+  const antalKlar = elever.filter((e) => e.oensker.length === 3).length;
+  const antalMangler = totalElever - antalKlar;
+  const procentKlar = totalElever > 0 ? Math.round((antalKlar / totalElever) * 100) : 0;
 
   if (indlaeser) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="text-slate-400 font-medium animate-pulse">Indlæser heste og ryttere...</div>
+        <div className="text-slate-400 font-medium animate-pulse">Indlæser elevønsker og niveauer...</div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="max-w-6xl mx-auto p-4 space-y-6">
+      {/* Topbar navigation & Månedsindikator */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
+            <span>⭐ Elevønsker</span>
+            <span className="text-sm font-semibold px-3 py-1 rounded-full bg-sky-950 text-sky-300 border border-sky-800">
+              Måned: {naesteMaanedStr}
+            </span>
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Samlet elevmatrix grupperet efter niveau. Grønne felter har afgivet 3 ønsker, gule felter mangler.
+          </p>
+        </div>
+
         <button
-          onClick={() => navigate(`/stald/lektion/${lektionId}`)}
-          className="min-h-[48px] px-4 rounded-xl bg-slate-800 text-slate-300 hover:text-white border border-slate-700 font-medium flex items-center gap-2"
+          type="button"
+          onClick={indlaesAlt}
+          className="min-h-[44px] px-4 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 text-sm font-semibold transition cursor-pointer self-start sm:self-auto flex items-center gap-2"
         >
-          ← Tilbage til lektion
+          <span>🔄</span>
+          <span>Opdater</span>
         </button>
-        <span className="text-sm font-semibold text-sky-400 bg-sky-950/60 border border-sky-800 px-3 py-1.5 rounded-full">
-          Ønsker til {naesteMaanedStr}
-        </span>
       </div>
 
-      <div>
-        <h1 className="text-2xl font-bold text-white">Elevønsker (Sidste time i måneden)</h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Vælg elev og markér op til 3 hesteønsker sammen med rytteren.
-        </p>
-      </div>
+      {/* Statusbar & Nøgletal */}
+      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 shadow-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div className="space-y-1.5 flex-1">
+          <div className="flex items-center justify-between text-sm font-semibold">
+            <span className="text-slate-300">Status på ønsker for {naesteMaanedStr}</span>
+            <span className="text-sky-400 font-bold">{antalKlar} af {totalElever} klar ({procentKlar}%)</span>
+          </div>
+          <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden flex border border-slate-700/60">
+            <div
+              className="bg-emerald-500 transition-all duration-500 rounded-full"
+              style={{ width: `${procentKlar}%` }}
+            />
+          </div>
+        </div>
 
-      {/* Ryttervælger fliser */}
-      <div>
-        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-          Vælg elev på holdet
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {pladser.map((p) => {
-            const erValgt = p.id === valgtPladsId;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  setValgtPladsId(p.id);
-                  setOensker([]);
-                  setGemtStatus(null);
-                }}
-                className={`min-h-[48px] px-4 rounded-xl font-semibold text-sm transition-all border ${
-                  erValgt
-                    ? 'border-sky-500 bg-sky-950/80 text-sky-200 ring-2 ring-sky-400'
-                    : 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-700'
-                }`}
-              >
-                {p.rytterNavnKort ?? 'Rytter'}
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setFilterStatus('Alle')}
+            className={`min-h-[40px] px-3.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+              filterStatus === 'Alle'
+                ? 'bg-slate-700 text-white border-slate-600 shadow'
+                : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
+            }`}
+          >
+            Alle ({totalElever})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterStatus('Mangler')}
+            className={`min-h-[40px] px-3.5 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+              filterStatus === 'Mangler'
+                ? 'bg-amber-600 text-white border-amber-500 shadow'
+                : 'bg-amber-950/40 text-amber-300 border-amber-800/80 hover:bg-amber-950/60'
+            }`}
+          >
+            <span>⚠️ Mangler ({antalMangler})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterStatus('Klar')}
+            className={`min-h-[40px] px-3.5 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+              filterStatus === 'Klar'
+                ? 'bg-emerald-600 text-white border-emerald-500 shadow'
+                : 'bg-emerald-950/40 text-emerald-300 border-emerald-800/80 hover:bg-emerald-950/60'
+            }`}
+          >
+            <span>✓ Klar ({antalKlar})</span>
+          </button>
         </div>
       </div>
 
-      {/* Valgte ønsker overblik */}
-      {valgtPlads && (
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-white">
-              Hesteønsker for {valgtPlads.rytterNavnKort} ({oensker.length}/3 valgt)
-            </h2>
+      {/* Filter og søgning bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+          <button
+            type="button"
+            onClick={() => setFilterNiveau('Alle')}
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition cursor-pointer shrink-0 ${
+              filterNiveau === 'Alle'
+                ? 'bg-sky-600 text-white border-sky-400 shadow'
+                : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
+            }`}
+          >
+            Alle niveauer
+          </button>
+          {niveauer.map((niv) => (
             <button
+              key={niv}
               type="button"
-              onClick={haandterGemOensker}
-              disabled={oensker.length === 0}
-              className="min-h-[48px] px-6 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-sm shadow-lg shadow-emerald-950/50"
+              onClick={() => setFilterNiveau(niv)}
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition cursor-pointer shrink-0 ${
+                filterNiveau === niv
+                  ? 'bg-sky-600 text-white border-sky-400 shadow'
+                  : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
+              }`}
             >
-              Gem ønsker
+              {niv}
             </button>
-          </div>
+          ))}
+        </div>
 
-          {gemtStatus && (
-            <p className="text-sm font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-800 p-3 rounded-xl animate-in fade-in">
-              {gemtStatus}
-            </p>
-          )}
+        <input
+          type="text"
+          value={soeg}
+          onChange={(e) => setSoeg(e.target.value)}
+          placeholder="🔍 Søg elev..."
+          className="w-full sm:w-64 min-h-[42px] px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+        />
+      </div>
 
-          {/* Hestefliser (kun egnede heste, store touch fliser) */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
-            {tilgaengeligeHeste.map((hest) => {
-              const oenskeNr = oensker.indexOf(hest.id);
-              const erValgt = oenskeNr !== -1;
+      {/* MATRIX GRUPPERET EFTER NIVEAU */}
+      <div className="space-y-8">
+        {eleverPrNiveau.map(({ niveau, elever: niveauElever }) => {
+          if (niveauElever.length === 0 && filterNiveau === 'Alle') return null;
 
-              return (
+          const klarCount = niveauElever.filter((e) => e.oensker.length === 3).length;
+
+          return (
+            <section key={niveau} className="space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-xl font-bold text-white">{niveau}</h2>
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    {niveauElever.length} elever
+                  </span>
+                </div>
+                <span className="text-xs font-medium text-slate-400">
+                  {klarCount} af {niveauElever.length} klar
+                </span>
+              </div>
+
+              {niveauElever.length === 0 ? (
+                <p className="text-slate-500 text-sm italic py-2">Ingen elever matcher søgekriterierne.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                  {niveauElever.map((elev) => {
+                    const harTreOensker = elev.oensker.length === 3;
+                    const oenskeNavne = elev.oensker
+                      .map((id, idx) => `${idx + 1}. ${hesteMap.get(id)?.navn ?? 'Hest'}`)
+                      .join(' • ');
+
+                    return (
+                      <button
+                        key={elev.rytterId}
+                        type="button"
+                        onClick={() => aabnRedigering(elev)}
+                        className={`text-left rounded-2xl border p-4 flex flex-col justify-between gap-3 transition-all active:scale-[0.98] cursor-pointer shadow-md ${
+                          harTreOensker
+                            ? 'bg-emerald-950/40 hover:bg-emerald-950/60 border-emerald-500/80 ring-1 ring-emerald-500/30'
+                            : 'bg-amber-950/40 hover:bg-amber-950/60 border-amber-500/80 ring-1 ring-amber-500/30'
+                        }`}
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-lg text-white truncate">
+                              {elev.rytterNavnKort}
+                            </span>
+                            {harTreOensker ? (
+                              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-900/90 text-emerald-300 border border-emerald-700 shrink-0">
+                                ✓ 3/3 ønsker
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-900/90 text-amber-300 border border-amber-700 shrink-0">
+                                ⚠️ Mangler ({elev.oensker.length}/3)
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-xs text-slate-400">
+                            {elev.holdnavn}
+                          </div>
+                        </div>
+
+                        <div className="pt-2.5 border-t border-slate-800/80">
+                          {harTreOensker ? (
+                            <div className="text-xs text-emerald-300 font-medium truncate" title={oenskeNavne}>
+                              {oenskeNavne}
+                            </div>
+                          ) : elev.oensker.length > 0 ? (
+                            <div className="text-xs text-amber-300/90 font-medium truncate" title={oenskeNavne}>
+                              {oenskeNavne} (mangler {3 - elev.oensker.length})
+                            </div>
+                          ) : (
+                            <div className="text-xs text-amber-400/80 italic flex items-center justify-between">
+                              <span>Tryk for at vælge heste</span>
+                              <span>+</span>
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+
+      {/* REDIGERINGS-MODAL FOR VALGT ELEV */}
+      {redigerElev && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+        >
+          <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-800 flex items-start justify-between gap-4 bg-slate-900/95">
+              <div>
+                <span className="text-xs uppercase font-bold text-sky-400 tracking-wider">
+                  Niveau: {redigerElev.niveau} • {redigerElev.holdnavn}
+                </span>
+                <h2 className="text-2xl font-bold text-white mt-0.5">
+                  Hesteønsker for {redigerElev.rytterNavnKort}
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Vælg op til 3 heste i prioriteret rækkefølge til måned {naesteMaanedStr}.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setRedigerElev(null)}
+                className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white flex items-center justify-center font-bold text-lg cursor-pointer"
+                title="Luk"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Valgte ønsker statuslinje */}
+            <div className="px-6 py-4 bg-slate-950/80 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase text-slate-400">Valgte heste:</span>
+                {valgteOensker.length === 0 ? (
+                  <span className="text-xs text-amber-300 italic">Ingen heste valgt endnu</span>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {valgteOensker.map((hid, idx) => {
+                      const h = hesteMap.get(hid);
+                      const erEgnet = h ? evaluerHestEgnethed(h, redigerElev).egnet : true;
+                      return (
+                        <span
+                          key={hid}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold border ${
+                            erEgnet
+                              ? 'bg-emerald-950 text-emerald-300 border-emerald-700'
+                              : 'bg-amber-950 text-amber-300 border-amber-700'
+                          }`}
+                        >
+                          <span>
+                            {idx + 1}. {h?.navn ?? 'Hest'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleHestOenske(hid)}
+                            className="hover:text-white cursor-pointer ml-0.5"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setValgteOensker([])}
+                      className="text-xs font-semibold px-2 py-0.5 rounded-lg border border-rose-900/80 bg-rose-950/50 text-rose-300 hover:bg-rose-900/60 cursor-pointer ml-1 transition"
+                      title="Fjern alle valgte heste"
+                    >
+                      Ryd valg
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+                <span>{valgteOensker.length} af 3 valgt</span>
+              </div>
+            </div>
+
+            {gemtStatus && (
+              <div className="px-6 py-3 bg-emerald-950/80 border-b border-emerald-800 text-emerald-300 text-sm font-bold flex items-center gap-2">
+                <span>✓</span>
+                <span>{gemtStatus}</span>
+              </div>
+            )}
+
+            {/* Hestevælger Grid (scrollable) - To sektioner */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-7">
+              {/* SEKTION 1: Egnede heste (grønne, øverst) */}
+              <section className="space-y-3">
+                <div className="flex items-center justify-between border-b border-emerald-900/60 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-bold text-emerald-400 flex items-center gap-1.5">
+                      <span>🟢</span> Egnede heste til {redigerElev.niveau}
+                    </span>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
+                      {egnedeHeste.length}
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-400 font-medium">
+                    Godkendt til rytter og niveau
+                  </span>
+                </div>
+
+                {egnedeHeste.length === 0 ? (
+                  <p className="text-slate-500 text-sm italic py-2">
+                    Ingen heste godkendt direkte til dette niveau.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {egnedeHeste.map(({ hest }) => {
+                      const oenskeNr = valgteOensker.indexOf(hest.id);
+                      const erValgt = oenskeNr !== -1;
+
+                      return (
+                        <button
+                          key={hest.id}
+                          type="button"
+                          onClick={() => toggleHestOenske(hest.id)}
+                          className={`min-h-[92px] p-4 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                            erValgt
+                              ? 'border-emerald-500 bg-emerald-950/80 ring-2 ring-emerald-400 shadow-md'
+                              : 'border-emerald-900/50 bg-slate-850 hover:border-emerald-600/70 hover:bg-slate-800 text-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-lg font-bold text-white">{hest.navn}</span>
+                            {erValgt ? (
+                              <span className="w-7 h-7 rounded-full bg-emerald-500 text-white font-bold text-xs flex items-center justify-center shadow">
+                                {oenskeNr + 1}.
+                              </span>
+                            ) : (
+                              <span className="w-6 h-6 rounded-full border border-emerald-700/60 text-emerald-400 text-xs flex items-center justify-center">
+                                +
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-2 space-y-1">
+                            <div className="text-xs text-slate-400 flex items-center justify-between">
+                              <span>{hest.temperament ?? 'Rolig'}</span>
+                              <span>{hest.stangmaal_cm} cm</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                                <span>✓</span> Egnet til {redigerElev.niveau}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              {/* SEKTION 2: Ikke godkendte heste til niveau (nederst) */}
+              <section className="space-y-3">
+                <div className="flex items-center justify-between border-b border-amber-900/60 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-bold text-amber-400 flex items-center gap-1.5">
+                      <span>⚠️</span> Ikke godkendte heste til niveau
+                    </span>
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800">
+                      {ikkeEgnedeHeste.length}
+                    </span>
+                  </div>
+                  <span className="text-xs text-amber-500/90 font-medium">
+                    Kan vælges med dispensation
+                  </span>
+                </div>
+
+                {ikkeEgnedeHeste.length === 0 ? (
+                  <p className="text-slate-500 text-sm italic py-2">
+                    Alle heste er godkendte til dette niveau.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {ikkeEgnedeHeste.map(({ hest, aarsag }) => {
+                      const oenskeNr = valgteOensker.indexOf(hest.id);
+                      const erValgt = oenskeNr !== -1;
+
+                      return (
+                        <button
+                          key={hest.id}
+                          type="button"
+                          onClick={() => toggleHestOenske(hest.id)}
+                          className={`min-h-[92px] p-4 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                            erValgt
+                              ? 'border-amber-500 bg-amber-950/80 ring-2 ring-amber-400 shadow-md'
+                              : 'border-slate-800/80 bg-slate-900/50 hover:border-slate-700 text-slate-400'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className={`text-lg font-bold ${erValgt ? 'text-white' : 'text-slate-300'}`}>
+                              {hest.navn}
+                            </span>
+                            {erValgt ? (
+                              <span className="w-7 h-7 rounded-full bg-amber-500 text-white font-bold text-xs flex items-center justify-center shadow">
+                                {oenskeNr + 1}.
+                              </span>
+                            ) : (
+                              <span className="w-6 h-6 rounded-full border border-slate-700 text-slate-500 text-xs flex items-center justify-center">
+                                +
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-2 space-y-1">
+                            <div className="text-xs text-slate-500 flex items-center justify-between">
+                              <span>{hest.temperament ?? 'Rolig'}</span>
+                              <span>{hest.stangmaal_cm} cm</span>
+                            </div>
+                            <div>
+                              <span
+                                className="text-[10px] text-amber-400 font-semibold truncate block"
+                                title={aarsag}
+                              >
+                                ⚠️ {aarsag ?? 'Ikke godkendt'}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-800 bg-slate-900 flex flex-wrap items-center justify-between gap-3">
+              {redigerElev.oensker.length > 0 ? (
                 <button
-                  key={hest.id}
                   type="button"
-                  onClick={() => toggleHestOenske(hest.id)}
-                  className={`min-h-[80px] p-4 rounded-2xl border text-left flex flex-col justify-between transition-all ${
-                    erValgt
-                      ? 'border-emerald-500 bg-emerald-950/60 ring-2 ring-emerald-400'
-                      : 'border-slate-800 bg-slate-850 hover:border-slate-700 text-slate-300'
-                  }`}
+                  onClick={haandterRydOensker}
+                  className="min-h-[48px] px-4 rounded-xl border border-rose-900/80 bg-rose-950/40 text-rose-300 hover:bg-rose-900/60 font-semibold cursor-pointer text-sm flex items-center gap-1.5 transition"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold text-white">{hest.navn}</span>
-                    {erValgt && (
-                      <span className="w-7 h-7 rounded-full bg-emerald-500 text-white font-bold text-xs flex items-center justify-center">
-                        {oenskeNr + 1}.
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-400 mt-2 flex items-center justify-between">
-                    <span>{hest.temperament ?? 'Rolig'}</span>
-                    <span>{hest.stangmaal_cm} cm</span>
-                  </div>
+                  <span>🗑️</span>
+                  <span>Ryd alle ønsker</span>
                 </button>
-              );
-            })}
+              ) : (
+                <div />
+              )}
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRedigerElev(null)}
+                  className="min-h-[48px] px-5 rounded-xl border border-slate-700 bg-slate-800 font-semibold text-slate-300 hover:bg-slate-700 cursor-pointer text-sm"
+                >
+                  Annuller
+                </button>
+                <button
+                  type="button"
+                  onClick={haandterGemOensker}
+                  disabled={valgteOensker.length === 0 && redigerElev.oensker.length === 0}
+                  className="min-h-[48px] px-7 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-sm shadow-lg shadow-emerald-950/50 cursor-pointer transition flex items-center gap-2"
+                >
+                  <span>💾</span>
+                  <span>
+                    {valgteOensker.length === 0
+                      ? 'Gem som ryddet (0 ønsker)'
+                      : `Gem ${valgteOensker.length} af 3 ønsker`}
+                  </span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

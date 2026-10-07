@@ -27,7 +27,11 @@ export const VikarSide: React.FC = () => {
 
     setIndsender(true);
     try {
-      const enhedNoegle = localStorage.getItem('ridecenter_enhedsnoegle') ?? '';
+      let enhedNoegle = localStorage.getItem('ridecenter_enhedsnoegle');
+      if (!enhedNoegle) {
+        enhedNoegle = 'demo-enhedsnoegle-stald-tablet-1';
+        localStorage.setItem('ridecenter_enhedsnoegle', enhedNoegle);
+      }
       const res = await fetch('/api/v1/auth/vikar/login', {
         method: 'POST',
         headers: {

@@ -14,11 +14,41 @@ export function holdId(holdnavn: string): string {
 
 export function byggBrugere(): SeedBruger[] {
   return [
-    { id: brugerId('Malene'), navn: 'Malene', roller: ['Ledelse', 'Ridelaerer'], email: 'malene@demo.dk' },
-    { id: brugerId('Marie'), navn: 'Marie', roller: ['Ridelaerer'], email: 'marie@demo.dk' },
-    { id: brugerId('Camilla'), navn: 'Camilla', roller: ['Ridelaerer'], email: null },
-    { id: brugerId('Birgit'), navn: 'Birgit', roller: ['Ridelaerer'], email: null },
-    { id: brugerId('Ella J.'), navn: 'Ella J.', roller: ['Staldelev'], email: null },
+    {
+      id: brugerId('Malene'),
+      navn: 'Malene',
+      roller: ['Ledelse', 'Ridelaerer'],
+      email: 'malene@demo.dk',
+      pin: '1111',
+    },
+    {
+      id: brugerId('Marie'),
+      navn: 'Marie',
+      roller: ['Ridelaerer'],
+      email: 'marie@demo.dk',
+      pin: '2222',
+    },
+    {
+      id: brugerId('Camilla'),
+      navn: 'Camilla',
+      roller: ['Ridelaerer'],
+      email: null,
+      pin: '2223',
+    },
+    {
+      id: brugerId('Birgit'),
+      navn: 'Birgit',
+      roller: ['Ridelaerer'],
+      email: null,
+      pin: '2224',
+    },
+    {
+      id: brugerId('Ella J.'),
+      navn: 'Ella J.',
+      roller: ['Staldelev'],
+      email: null,
+      pin: '3333',
+    },
   ];
 }
 

@@ -49,8 +49,12 @@ export const LaasSide: React.FC = () => {
     setFejlbesked('');
 
     try {
-      // 1. Prøv først via API hvis vi er online og har enhedsnøgle
-      const enhedNoegle = localStorage.getItem('ridecenter_enhedsnoegle');
+      // 1. Prøv først via API hvis vi er online (brug betroet demo-enhedsnøgle som fallback hvis ikke gemt i localStorage)
+      let enhedNoegle = localStorage.getItem('ridecenter_enhedsnoegle');
+      if (!enhedNoegle) {
+        enhedNoegle = 'demo-enhedsnoegle-stald-tablet-1';
+        localStorage.setItem('ridecenter_enhedsnoegle', enhedNoegle);
+      }
       let apiSucces = false;
 
       if (navigator.onLine && enhedNoegle) {

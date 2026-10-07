@@ -17,6 +17,15 @@ export interface SeedIndstillinger {
 const TABELLER = [
   'audit_haendelse',
   'dashboard_notifikation',
+  'fremmoederegistrering',
+  'omplacering',
+  'hestestatusmelding',
+  'genbesaettelsesforslag',
+  'venteliste',
+  'rapport_udtraek',
+  'cheat_sheet_kode',
+  'vikar_engangskode',
+  'enhed',
   'lektionsplads',
   'lektion',
   'hestetildeling',
@@ -69,15 +78,54 @@ export async function skrivSeed(
 
   await prisma.$transaction(
     async (tx) => {
-      await tx.bruger.createMany({
-        data: data.brugere.map((b) => ({
-          id: b.id,
-          navn: b.navn,
-          roller: b.roller,
-          email: b.email,
-          password_hash: b.email ? passwordHash : null,
-        })),
+      // 1. Brugere med password og Argon2id PIN-hash
+      for (const b of data.brugere) {
+        const pinHash = b.pin ? await argon2.hash(b.pin) : null;
+        await tx.bruger.create({
+          data: {
+            id: b.id,
+            navn: b.navn,
+            roller: b.roller,
+            email: b.email,
+            password_hash: b.email ? passwordHash : null,
+            pin_hash: pinHash,
+          },
+        });
+      }
+
+      // 2. Standard Cheat Sheet koder (T170)
+      const { STANDARD_CHEAT_SHEET_KODER } = await import('./data/cheat-sheet-koder');
+      await tx.cheatSheetKode.createMany({
+        data: STANDARD_CHEAT_SHEET_KODER,
       });
+
+      // 3. Betroet demo-enhed ("Stald-tablet 1") (T170)
+      const demoEnhedsnoegle = 'demo-enhedsnoegle-stald-tablet-1';
+      const demoEnhedsnoegleHash = createHash('sha256').update(demoEnhedsnoegle).digest('hex');
+      const demoEnrollmentHash = createHash('sha256').update('demo-enrollment-token').digest('hex');
+      const enhed = await tx.enhed.create({
+        data: {
+          navn: 'Stald-tablet 1',
+          enrollment_token_hash: demoEnrollmentHash,
+          enhedsnoegle_hash: demoEnhedsnoegleHash,
+          aktiv: true,
+        },
+      });
+
+      // 4. 3 aktive 6-cifrede vikarkoder (T170)
+      const demoVikarKoder = ['123456', '654321', '888999'];
+      const om90Dage = new Date(nu.getTime() + 90 * 24 * 60 * 60 * 1000);
+      for (const vk of demoVikarKoder) {
+        const vkHash = await argon2.hash(vk);
+        await tx.vikarEngangskode.create({
+          data: {
+            kode_hash: vkHash,
+            udstedt_af: ledelse.id,
+            udloebsdato: om90Dage,
+            status: 'Aktiv',
+          },
+        });
+      }
 
       await tx.hest.createMany({
         data: data.heste.map((h) => ({
@@ -122,17 +170,31 @@ export async function skrivSeed(
       });
 
       await tx.sikkerhedsprofil.createMany({
-        data: data.ryttere.filter(harSikkerhedsprofil).map((r) => ({
-          rytter_id: r.id,
-          faldtraume_note: krypterNote(r.faldtraumeNote),
-          angstkategori: krypterNote(r.angstkategori),
-          intern_note: krypterNote(r.internNote),
-          forbudte_heste: [...r.forbudteHeste],
-          paakraevede_heste: [...r.paakraevedeHeste],
-          kun_rolige_heste: r.kunRoligeHeste,
-          opdateret_af: ledelse.id,
-          opdateret: nu,
-        })),
+        data: data.ryttere.filter(harSikkerhedsprofil).map((r) => {
+          const koder: string[] = [];
+          let instruks: string | null = null;
+          if (r.angstkategori || r.kunRoligeHeste) {
+            koder.push('OBS-SKAANSOM', 'TRAEK-OP-I-RO');
+            instruks = 'Rytteren har brug for ekstra ro ved opsidning og venlig guidning under opvarmning.';
+          }
+          if (r.faldtraumeNote) {
+            koder.push('AFSTAND-3M', 'HJAELP-OPSTIGNING');
+            instruks = 'Hold mindst 3 meters afstand til andre heste i ridehuset. Hjælp gerne med bøjlelængde.';
+          }
+          return {
+            rytter_id: r.id,
+            faldtraume_note: krypterNote(r.faldtraumeNote),
+            angstkategori: krypterNote(r.angstkategori),
+            intern_note: krypterNote(r.internNote),
+            forbudte_heste: [...r.forbudteHeste],
+            paakraevede_heste: [...r.paakraevedeHeste],
+            kun_rolige_heste: r.kunRoligeHeste,
+            cheat_sheet_koder: koder,
+            adfaerdsinstruks: instruks,
+            opdateret_af: ledelse.id,
+            opdateret: nu,
+          };
+        }),
       });
 
       await tx.hold.createMany({
@@ -207,6 +269,76 @@ export async function skrivSeed(
               begrundelse_tekst: 'Historisk tildeling importeret fra papirlisterne.',
             };
           }),
+        });
+      }
+
+      // 5. Opret lektioner og lektionspladser for måneden (T170)
+      const datoIdagStr = nu.toISOString().slice(0, 10);
+      const datoIdag = dato(datoIdagStr);
+      for (const hold of data.hold) {
+        const underviserId = hold.fastUnderviserId ?? ledelse.id;
+        const lektion = await tx.lektion.create({
+          data: {
+            hold_id: hold.id,
+            dato: datoIdag,
+            underviser_id: underviserId,
+            status: 'Planlagt',
+          },
+        });
+
+        // Hent holdets tilmeldinger og tildel unikke heste til lektionspladserne
+        const holdetsTilmeldinger = data.tilmeldinger.filter((t) => t.holdId === hold.id);
+        const brugteHeste = new Set<string>();
+
+        for (const t of holdetsTilmeldinger) {
+          const hestTildeling = data.historik.find((h) => h.rytterId === t.rytterId && h.holdId === hold.id);
+          let valgtHestId: string | null = null;
+
+          if (hestTildeling?.hestId && !brugteHeste.has(hestTildeling.hestId)) {
+            valgtHestId = hestTildeling.hestId;
+          } else {
+            // Find en hest der ikke allerede er brugt på lektionen
+            const ledigHest = data.heste.find((h) => !brugteHeste.has(h.id));
+            valgtHestId = ledigHest?.id ?? null;
+          }
+
+          if (valgtHestId) {
+            brugteHeste.add(valgtHestId);
+          }
+
+          await tx.lektionsPlads.create({
+            data: {
+              lektion_id: lektion.id,
+              rytter_id: t.rytterId,
+              planlagt_hest_id: valgtHestId,
+              aktuel_hest_id: valgtHestId,
+            },
+          });
+        }
+      }
+
+      // 6. Pre-stage en realistisk test-case for akut drift (V3):
+      // Sæt hesten Toobi som "Sygemeldt" med en helbredsmelding fra staldelev Ella J.
+      const toobi = data.heste.find((h) => h.navn === 'Toobi');
+      const ella = data.brugere.find((b) => b.navn.startsWith('Ella'));
+      if (toobi) {
+        await tx.hest.update({
+          where: { id: toobi.id },
+          data: { sundhedsstatus: 'Sygemeldt' },
+        });
+
+        await tx.hestestatusmelding.create({
+          data: {
+            hest_id: toobi.id,
+            type: 'Helbred',
+            alvorlighed: 'KanIkkeBruges',
+            beskrivelse: 'Halter let på venstre forben i trav. Skal tilses af dyrlæge.',
+            meldt_af_bruger_id: ella?.id ?? ledelse.id,
+            meldt_af_navn: ella?.navn ?? 'Ella J.',
+            klient_tidspunkt: nu,
+            server_tidspunkt: nu,
+            kommando_id: '11111111-2222-3333-4444-555555555555',
+          },
         });
       }
     },

@@ -45,6 +45,11 @@ try {
   console.log(
     'Log ind på /admin som malene@demo.dk (Ledelse) eller marie@demo.dk (Ridelærer) med SEED_ADGANGSKODE.',
   );
+  console.log('\n--- DEMO STALD TABLET & PIN-KODER (T170) ---');
+  console.log('PIN-koder: Malene: 1111 | Marie: 2222 | Camilla: 2223 | Birgit: 2224 | Ella J: 3333');
+  console.log('Aktive 6-cifrede vikarkoder: 123456, 654321, 888999');
+  console.log('Betroet enhed: "Stald-tablet 1"');
+  console.log('--------------------------------------------\n');
 } finally {
   await prisma.$disconnect();
 }

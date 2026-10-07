@@ -153,18 +153,29 @@ export class PullService {
         },
       },
       include: {
-        hold: true,
+        hold: {
+          include: {
+            tilmeldinger: {
+              include: { rytter: true },
+            },
+          },
+        },
       },
     });
 
     const lektionIds = lektioner.map((l) => l.id);
 
-    // Hent pladser
+    // Hent pladser med rytternavne og sikkerhedsprofil
     const pladser = await this.prisma.lektionsPlads.findMany({
       where: {
         lektion_id: { in: lektionIds },
       },
       include: {
+        rytter: {
+          include: {
+            sikkerhedsprofil: true,
+          },
+        },
         fremmoeder: {
           orderBy: { klient_tidspunkt: 'desc' },
           take: 1,
@@ -176,6 +187,28 @@ export class PullService {
     const heste = await this.prisma.hest.findMany({
       where: { aktiv: true },
     });
+
+    const domainHeste = heste.map(tilHestData);
+    const lektionerMap = new Map(lektioner.map((l) => [l.id, l]));
+
+    // Byg holdData-map
+    const holdDataMap = new Map<string, any>();
+    for (const lektion of lektioner) {
+      if (holdDataMap.has(lektion.hold_id)) continue;
+      const tilmeldinger = lektion.hold.tilmeldinger.map((t) => ({
+        id: t.id,
+        rytterId: t.rytter_id,
+        holdId: t.hold_id,
+        ancienitetDato: t.ancienitet_dato.toISOString().slice(0, 10),
+      }));
+      const ryttere = lektion.hold.tilmeldinger.map((t) => tilRytterRegelData(t.rytter, null));
+      const parthesteMap = byggPartheste(tilmeldinger, ryttere);
+      const holdPartheste = parthesteMap.get(lektion.hold_id) ?? {};
+      holdDataMap.set(lektion.hold_id, {
+        ...tilHoldData(lektion.hold),
+        partheste: holdPartheste,
+      });
+    }
 
     // Hent brugere med PIN hash (kun Ridelaerer, Ledelse, Staldelev)
     const brugere = await this.prisma.bruger.findMany({
@@ -219,20 +252,46 @@ export class PullService {
           erSpringhold: l.hold.er_springhold,
           fremmoedeLukket: l.fremmoede_lukket?.toISOString() ?? null,
         })),
-        pladser: pladser.map((p) => ({
-          id: p.id,
-          lektionId: p.lektion_id,
-          rytterId: p.rytter_id,
-          aktuelHestId: p.aktuel_hest_id,
-          planlagtHestId: p.planlagt_hest_id,
-          status: p.fremmoeder[0]?.status ?? null,
-        })),
+        pladser: pladser.map((p) => {
+          let instruks: string | null = null;
+          if (p.rytter.sikkerhedsprofil?.adfaerdsinstruks) {
+            try {
+              instruks = this.krypto.dekrypter(p.rytter.sikkerhedsprofil.adfaerdsinstruks);
+            } catch {
+              instruks = null;
+            }
+          }
+
+          const lektion = lektionerMap.get(p.lektion_id);
+          const holdData = lektion ? holdDataMap.get(lektion.hold_id) : null;
+          let godkendteHeste: string[] = [];
+          if (holdData) {
+            const domainRytter = tilRytterRegelData(p.rytter, p.rytter.sikkerhedsprofil);
+            const egnethed = beregnEgnethed(domainRytter, holdData, domainHeste);
+            godkendteHeste = egnethed.godkendte;
+          }
+
+          return {
+            id: p.id,
+            lektionId: p.lektion_id,
+            rytterId: p.rytter_id,
+            rytterNavnKort: formaterKortNavn(p.rytter.fornavn, p.rytter.efternavn),
+            aktuelHestId: p.aktuel_hest_id,
+            planlagtHestId: p.planlagt_hest_id,
+            status: p.fremmoeder[0]?.status ?? null,
+            godkendteHeste,
+            cheatSheetKoder: p.rytter.sikkerhedsprofil?.cheat_sheet_koder ?? [],
+            adfaerdsinstruks: instruks,
+          };
+        }),
         heste: heste.map((h) => ({
           id: h.id,
           navn: h.navn,
           stangmaal_cm: h.stangmaal_cm,
           sundhedsstatus: h.sundhedsstatus,
           temperament: h.temperament,
+          godkendt_til_begyndere: h.godkendt_til_begyndere,
+          egnet_oevet: h.egnet_oevet,
           staldnoter: h.staldnoter,
           hviledag: h.hviledag,
           max_lektioner_dag: h.max_lektioner_dag,

@@ -46,5 +46,28 @@ export const staldOenskeRuter: FastifyPluginAsyncZod = async (app) => {
       return { ok: true };
     },
   );
+
+  // GET /stald/oensker/:maaned: Hent månedens registrerede ønsker til stald-tabletten
+  app.get(
+    '/stald/oensker/:maaned',
+    {
+      schema: {
+        params: z.object({
+          maaned: z.string().regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/),
+        }),
+      },
+    },
+    async (request) => {
+      const oensker = await app.prisma.elevoenske.findMany({
+        where: { maaned: request.params.maaned },
+        orderBy: [{ rytter_id: 'asc' }, { prioritet: 'asc' }],
+      });
+      return oensker.map((o) => ({
+        rytter_id: o.rytter_id,
+        prioritet: o.prioritet,
+        oensket_hest_id: o.oensket_hest_id,
+      }));
+    },
+  );
 };
 

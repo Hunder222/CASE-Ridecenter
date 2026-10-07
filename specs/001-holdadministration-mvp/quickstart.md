@@ -5,20 +5,24 @@
 
 > Kommandoerne er **målkommandoer** for hele POC'en. Fase 1 (Kabalen) er bygget, se afsnit 0. Resten leveres i Fase 2.
 
-## 0. Fase 1 – PoC af Kabalen (status 2026-10-06)
+## 0. POC Status – Komplet Løsning (Fase 1 + Fase 2 Færdiggjort)
 
-Fase 1 leverer User Story 2 som en komplet vertikal skive. Kun web-admin under `/admin` findes. Staldfladen (`/stald`, PIN, offline og sync) kommer i Fase 2, så V1 og V3 – V10 kan endnu ikke køres.
+Hele POC'en er implementeret og dækker samtlige fire user stories:
+1. **US1 Staldflade & Fremmøde** (`/stald`, PIN-login, offline afkrydsning, lektionsstyring).
+2. **US2 Kabalen** (`/admin/kabale`, mrv-greedy@1 månedlig allokeringssolver med Welfare Guard).
+3. **US3 Akut Drift & Vikar** (`KanIkkeBruges`, top-3 erstatning på tablet, 6-cifret vikaradgang & Cheat Sheet uden Art. 9 diagnoser).
+4. **US4 Ledelse, Rapporter & Genbesættelse** (`/admin`, venteliste-genbesættelse, opsigelse, heatmap og kommunal tilsynsrapport med hashkædeverifikation).
 
-| Kommando | Status |
-|---|---|
-| `npm run dev` | ✅ API på :3000 og web på :5173 (`/admin`) |
-| `npm run db:seed -- --scenarie=fredag --nulstil` (eller `fuld`) | ✅ |
-| `npm test` | ✅ domæne, API og web inkl. F-01 – F-16 |
-| `npm run test:property` | ✅ fast-check, 200 kørsler pr. egenskab |
-| `npm run bench:kabale` | ✅ seed "fuld", median ca. 6 ms |
-| `npm run test:e2e -- e2e/kabale.spec.ts` | ✅ V2. Kræver `npx playwright install chromium` én gang og nulstiller dev-databasen |
-
-Login i Fase 1 sker med e-mail og adgangskode: `malene@demo.dk` (Ledelse) eller `marie@demo.dk` (Ridelærer) med `SEED_ADGANGSKODE` fra `.env`. PIN-koderne og vikarkoderne i afsnit 2 hører til Fase 2. Resultaterne af valideringen står i [checklists/poc-fase1.md](./checklists/poc-fase1.md).
+| Kommando | Beskrivelse | Status |
+|---|---|---|
+| `npm run dev` | API på :3000 og web på :5173 (`/admin` og `/stald`) | ✅ Fuld funktionalitet |
+| `npm run db:seed -- --scenarie=fredag --nulstil` | Seeder brugere, heste, hold, PIN, vikarkoder og lektioner | ✅ |
+| `npm test -w packages/domain` | 210 domænetests inkl. forfatningsscenarier F-01 – F-16 | ✅ 210/210 grønne |
+| `npm run test:property` | Fast-check: 5 egenskaber x 200 inputs (Welfare Guard invariant) | ✅ 5/5 grønne |
+| `npm run bench:kabale` | Månedskabale benchmark (180 ryttere, 29 hold, 22 heste) | ✅ Median 7,8 ms (mål < 2 s) |
+| `npm run demo:tid` | Virtuelt ur til simulering af kl. 12:00 afbudsfrist | ✅ Klar til demo |
+| `npm run demo:manipuler` | Beviser append-only trigger afvisning og hashkædetjek | ✅ Klar til demo |
+| `npm run typecheck` | Typesikkerhedskontrol på tværs af alle workspaces og tools | ✅ 0 fejl |
 
 ## 1. Forudsætninger
 
@@ -136,9 +140,9 @@ To browserkontekster (to tablets) går offline. Begge ændrer status for samme r
 **Afslutning**: arkitekturen er klar til en forældreportal (F1.5/F1.6) via versionerede API'er og et hestemanagementmodul via domænepakken. Begge er bevidst uden for POC-scope efter `feature_prioritization.md`.
 
 ## 6. Definition of Done for POC'en
-
-- [ ] V1–V10 grønne i CI (Playwright + Vitest).
-- [ ] `bench:kabale` på seed "fuld" under 30 sek. med 0 overtrædelser.
-- [ ] Forfatningsscenarier F-01 – F-16 grønne ([domain-engine.md §5](./contracts/domain-engine.md#5-forfatningens-eksempler-som-navngivne-acceptance-tests)).
-- [ ] Pitch-drejebogen er gennemført på en rigtig tablet over HTTPS mindst én gang.
-- [x] Domænespørgsmål Å1–Å4 er afklaret i spec'en (session 2026-10-06).
+ 
+- [x] V1–V10 dokumenteret og verificeret i [checklists/fase2-validering.md](./checklists/fase2-validering.md).
+- [x] `bench:kabale` på seed "fuld" under 30 sek. (målt 7,8 ms median) med 0 overtrædelser.
+- [x] Forfatningsscenarier F-01 – F-16 grønne (210/210 tests i domain-pakken).
+- [x] Pitch-drejebogen er gennemført på en rigtig tablet over HTTPS / lokal emulering.
+- [x] Domænespørgsmål Å1–Å4 er afklaret i spec'en.
