@@ -18,6 +18,10 @@ import { tildelingsRuter } from './moduler/tildeling/routes';
 import { fremmoedeRuter } from './moduler/fremmoede/routes';
 import { omplaceringsRuter } from './moduler/lektioner/routes';
 import { cheatSheetRuter } from './moduler/ryttere/cheat-sheet-koder-routes';
+import { ventelisteRuter } from './moduler/venteliste/routes';
+import { dashboardRuter } from './moduler/dashboard/routes';
+import { rapportRuter } from './moduler/rapporter/routes';
+import { auditVerificerRuter } from './moduler/audit/verificer-routes';
 import { registrerFejlhaandtering } from './plugins/fejl';
 import { registrerKrypto } from './plugins/krypto';
 import { ssePlugin } from './plugins/sse';
@@ -65,6 +69,10 @@ export async function buildApp({ config, prisma, ur = () => new Date(), logger =
       await api.register(fremmoedeRuter);
       await api.register(omplaceringsRuter);
       await api.register(cheatSheetRuter);
+      await api.register(ventelisteRuter);
+      await api.register(dashboardRuter);
+      await api.register(rapportRuter);
+      await api.register(auditVerificerRuter);
     },
     { prefix: '/api/v1' },
   );

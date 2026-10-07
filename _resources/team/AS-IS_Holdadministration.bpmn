@@ -54,6 +54,8 @@
         <bpmn:flowNodeRef>Activity_PROC_09_Vikaroverlevering</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Activity_PROC_12_Afkrydsning</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Activity_PROC_11_Gennemfoerelse</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_0uj4nn0</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_1ix04uc</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_Staldhjaelpere" name="Staldhjælpere / Staldelever (2-4 erfarne piger)">
         <bpmn:flowNodeRef>Gateway_AkutSygdom</bpmn:flowNodeRef>
@@ -378,6 +380,14 @@
     <bpmn:sequenceFlow id="Flow_13" sourceRef="Activity_PROC_10_Klargoring" targetRef="Activity_PROC_11_Gennemfoerelse">
       <bpmn:categoryValueRef>CategoryValue_Fase3</bpmn:categoryValueRef>
     </bpmn:sequenceFlow>
+    <bpmn:boundaryEvent id="Event_0uj4nn0" attachedToRef="Activity_PROC_04_ManuelKabale">
+      <bpmn:categoryValueRef>CategoryValue_Fase1</bpmn:categoryValueRef>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_1nbda1m" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Event_1ix04uc" attachedToRef="Activity_PROC_09_Vikaroverlevering">
+      <bpmn:categoryValueRef>CategoryValue_Fase2</bpmn:categoryValueRef>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_1ijqawn" />
+    </bpmn:boundaryEvent>
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_Holdadministration_AS_IS">
@@ -585,6 +595,12 @@
         <bpmndi:BPMNLabel>
           <dc:Bounds x="3443" y="473" width="76" height="27" />
         </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_0qsrpef_di" bpmnElement="Event_0uj4nn0" bioc:stroke="#0d4372" bioc:fill="#bbdefb" color:background-color="#bbdefb" color:border-color="#0d4372">
+        <dc:Bounds x="1052" y="402" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_091tgsb_di" bpmnElement="Event_1ix04uc" bioc:stroke="#0d4372" bioc:fill="#bbdefb" color:background-color="#bbdefb" color:border-color="#0d4372">
+        <dc:Bounds x="2497" y="312" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="Flow_01_di" bpmnElement="Flow_01">
         <di:waypoint x="278" y="465" />

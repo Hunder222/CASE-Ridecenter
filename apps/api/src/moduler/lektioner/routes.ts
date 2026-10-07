@@ -62,5 +62,30 @@ export const omplaceringsRuter: FastifyPluginAsyncZod = async (app) => {
       };
     },
   );
+
+  // POST /lektioner/:id/afbud (T160)
+  const afbudService = new (await import('./afbud-service')).AfbudService(app.prisma, app);
+  app.post(
+    '/lektioner/:id/afbud',
+    {
+      onRequest: kraevRoller('Ridelaerer', 'Ledelse'),
+      schema: {
+        params: z.object({ id: Uuid }),
+        body: z.object({
+          lektionsplads_id: Uuid,
+          modtaget_tidspunkt: z.string().optional(),
+        }),
+      },
+    },
+    async (request) => {
+      const bruger = aktuelBruger(request);
+      return afbudService.registrerAfbud(
+        request.params.id,
+        request.body,
+        bruger,
+      );
+    },
+  );
 };
+
 

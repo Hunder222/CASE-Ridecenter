@@ -23,3 +23,10 @@ export {
 } from './erstatning/foreslaa-erstatninger';
 export { beregnEgnethed, type Egnethed } from './tildeling/egnethed';
 export { mrvGreedySolver } from './tildeling/mrv-solver';
+export { beregnOpsigelsesSlutdato } from './kalender/opsigelse';
+export {
+  rangerVenteliste,
+  type VentelisteKandidat,
+  type FrigjortHestInfo,
+  type HoldKontekst,
+} from './venteliste/ranger-venteliste';

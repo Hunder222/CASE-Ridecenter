@@ -54,6 +54,26 @@ export function AdminLayout() {
             {erLedelse && (
               <>
                 <li>
+                  <NavLink to="/admin/dashboard" className={linkStil}>
+                    Dashboard
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/admin/venteliste" className={linkStil}>
+                    Venteliste
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/admin/rapporter" className={linkStil}>
+                    Rapporter
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/admin/audit" className={linkStil}>
+                    Audit
+                  </NavLink>
+                </li>
+                <li>
                   <NavLink to="/admin/ryttere" className={linkStil}>
                     Ryttere
                   </NavLink>

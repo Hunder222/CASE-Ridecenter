@@ -11,6 +11,10 @@ import { RyttereSide } from './admin/ryttere/RyttereSide';
 import { SikkerhedsprofilSide } from './admin/ryttere/SikkerhedsprofilSide';
 import { naesteMaaned } from './faelles/maaned';
 import { KraevRolle } from './faelles/session';
+import { DashboardSide } from './admin/DashboardSide';
+import { VentelisteSide } from './admin/VentelisteSide';
+import { RapporterSide } from './admin/RapporterSide';
+import { AuditSide } from './admin/AuditSide';
 import { VikarKoderSide } from './admin/VikarKoderSide';
 import { CheatSheetSide } from './stald/CheatSheetSide';
 import { ErstatHestSide } from './stald/ErstatHestSide';
@@ -70,6 +74,38 @@ const router = createBrowserRouter([
         element: (
           <KraevRolle roller={['Ledelse']}>
             <SikkerhedsprofilSide />
+          </KraevRolle>
+        ),
+      },
+      {
+        path: 'dashboard',
+        element: (
+          <KraevRolle roller={['Ledelse']}>
+            <DashboardSide />
+          </KraevRolle>
+        ),
+      },
+      {
+        path: 'venteliste',
+        element: (
+          <KraevRolle roller={['Ledelse']}>
+            <VentelisteSide />
+          </KraevRolle>
+        ),
+      },
+      {
+        path: 'rapporter',
+        element: (
+          <KraevRolle roller={['Ledelse']}>
+            <RapporterSide />
+          </KraevRolle>
+        ),
+      },
+      {
+        path: 'audit',
+        element: (
+          <KraevRolle roller={['Ledelse']}>
+            <AuditSide />
           </KraevRolle>
         ),
       },
