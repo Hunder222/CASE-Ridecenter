@@ -41,6 +41,8 @@ model Bruger {
   profiler_opdateret       Sikkerhedsprofil[]
   notifikationer_kvitteret DashboardNotifikation[]
   audit_haendelser         AuditHaendelse[]
+  vikarkoder_udstedt       VikarEngangskode[]
+  rapporter_genereret      RapportUdtraek[]
 
   @@map("bruger")
 }
@@ -94,8 +96,9 @@ model Hest {
   partryttere       Rytter[]
   oensker           Elevoenske[]
   tildelinger       Hestetildeling[]
-  planlagte_pladser LektionsPlads[]  @relation("PlanlagtHest")
-  aktuelle_pladser  LektionsPlads[]  @relation("AktuelHest")
+  planlagte_pladser LektionsPlads[]      @relation("PlanlagtHest")
+  aktuelle_pladser  LektionsPlads[]      @relation("AktuelHest")
+  statusmeldinger   Hestestatusmelding[]
 
   @@map("hest")
 }
@@ -146,6 +149,7 @@ model Rytter {
   tilmeldinger     Holdtilmelding[]
   oensker          Elevoenske[]
   pladser          LektionsPlads[]
+  ventelister      Venteliste[]
 
   @@map("rytter")
 }
@@ -166,6 +170,10 @@ model Sikkerhedsprofil {
   paakraevede_heste String[] @default([]) @db.Uuid
   /// HC-07. Nervøse ryttere: ikke friske heste.
   kun_rolige_heste  Boolean  @default(false)
+  /// Koder fra CheatSheetKode-kataloget. Vises i stalden (kun koder).
+  cheat_sheet_koder String[] @default([])
+  /// 🔒 Krypteret. Anonymiseret, højst 200 tegn. Valideres mod diagnoseord (INSTRUKS_INDEHOLDER_DIAGNOSE).
+  adfaerdsinstruks  String?
   opdateret_af      String   @db.Uuid
   opdateret         DateTime @db.Timestamptz(6)
 
@@ -356,10 +364,12 @@ model LektionsPlads {
   /// {aktuel_hest_id: klient_ts} til LWW.
   felt_tidsstempler Json       @default("{}")
 
-  lektion       Lektion @relation(fields: [lektion_id], references: [id])
-  rytter        Rytter  @relation(fields: [rytter_id], references: [id])
-  planlagt_hest Hest?   @relation("PlanlagtHest", fields: [planlagt_hest_id], references: [id])
-  aktuel_hest   Hest?   @relation("AktuelHest", fields: [aktuel_hest_id], references: [id])
+  lektion       Lektion                 @relation(fields: [lektion_id], references: [id])
+  rytter        Rytter                  @relation(fields: [rytter_id], references: [id])
+  planlagt_hest Hest?                   @relation("PlanlagtHest", fields: [planlagt_hest_id], references: [id])
+  aktuel_hest   Hest?                   @relation("AktuelHest", fields: [aktuel_hest_id], references: [id])
+  fremmoeder    Fremmoederegistrering[]
+  omplaceringer Omplacering[]
 
   @@unique([lektion_id, rytter_id])
   @@map("lektionsplads")
@@ -417,8 +427,263 @@ model AuditHaendelse {
   hash             String
 
   bruger Bruger? @relation(fields: [bruger_id], references: [id])
+  enhed  Enhed?  @relation(fields: [enhed_id], references: [id])
 
   @@index([handling])
   @@index([entitet_id])
   @@map("audit_haendelse")
+}
+
+// ================================================================ FASE 2 (F2-A … F2-E)
+
+// ---------------------------------------------------------------- Enheder og vikarkoder
+
+/// Betroet stald-tablet/smartphone (R7).
+model Enhed {
+  id                    String    @id @default(uuid()) @db.Uuid
+  navn                  String
+  /// SHA-256 af engangs-enrollment-token. Nulstilles til "" når den er indløst.
+  enrollment_token_hash String
+  /// SHA-256 af enhedsnøglen (header X-Enhed-Noegle). Sat ved registrering.
+  enhedsnoegle_hash     String?
+  /// En deaktiveret enhed afvises ved sync og login.
+  aktiv                 Boolean   @default(true)
+  sidst_synkroniseret   DateTime? @db.Timestamptz(6)
+
+  audit_haendelser AuditHaendelse[]
+  vikarkoder       VikarEngangskode[]
+  fremmoeder       Fremmoederegistrering[]
+
+  @@map("enhed")
+}
+
+enum VikarKodeStatus {
+  Aktiv
+  Anvendt
+  Udloebet
+  Spaerret
+}
+
+model VikarEngangskode {
+  id                   String          @id @default(uuid()) @db.Uuid
+  /// SHA-256 af den 6-cifrede kode (R7). Klartekst vises kun én gang ved udstedelse.
+  kode_hash            String
+  udstedt_af           String          @db.Uuid
+  udstedt_dato         DateTime        @default(now()) @db.Timestamptz(6)
+  /// Standardudløb 90 dage.
+  udloebsdato          DateTime        @db.Timestamptz(6)
+  anvendt_dato         DateTime?       @db.Timestamptz(6)
+  /// Påkrævet ved brug.
+  anvendt_af_vikarnavn String?
+  anvendt_paa_enhed    String?         @db.Uuid
+  status               VikarKodeStatus @default(Aktiv)
+
+  udstedt_af_bruger Bruger @relation(fields: [udstedt_af], references: [id])
+  enhed             Enhed? @relation(fields: [anvendt_paa_enhed], references: [id])
+
+  @@index([kode_hash])
+  @@map("vikar_engangskode")
+}
+
+// ---------------------------------------------------------------- Hestestatus og cheat sheet
+
+enum StatusMeldingType {
+  Helbred
+  Adfaerd
+}
+
+enum Alvorlighed {
+  Info
+  Obs
+  KanIkkeBruges
+}
+
+/// 🧾 Append-only (trigger i migrationen).
+model Hestestatusmelding {
+  id                 String            @id @default(uuid()) @db.Uuid
+  hest_id            String            @db.Uuid
+  type               StatusMeldingType
+  /// KanIkkeBruges sætter straks Hest.sundhedsstatus = Sygemeldt.
+  alvorlighed        Alvorlighed
+  /// Højst 500 tegn, kun om hesten (CHECK i migrationen).
+  beskrivelse        String
+  meldt_af_bruger_id String?           @db.Uuid
+  meldt_af_navn      String
+  klient_tidspunkt   DateTime          @db.Timestamptz(6)
+  server_tidspunkt   DateTime          @default(now()) @db.Timestamptz(6)
+  /// Idempotensnøgle (sync).
+  kommando_id        String            @unique @db.Uuid
+
+  hest Hest @relation(fields: [hest_id], references: [id])
+
+  @@map("hestestatusmelding")
+}
+
+enum CheatSheetKategori {
+  Haandtering
+  Afstand
+  Opstigning
+  Kommunikation
+}
+
+model CheatSheetKode {
+  kode     String             @id
+  tekst    String
+  kategori CheatSheetKategori
+
+  @@map("cheat_sheet_kode")
+}
+
+// ---------------------------------------------------------------- Fremmøde og omplacering
+
+enum FremmoedeStatus {
+  Fremmoedt
+  Afbud_rettidigt
+  Afbud_for_sent
+  Udeblevet
+}
+
+/// 🧾 Append-only ⛓ hashkæde.
+model Fremmoederegistrering {
+  id                       String          @id @default(uuid()) @db.Uuid
+  lektionsplads_id         String          @db.Uuid
+  /// Denormaliseret til rapport og revision.
+  lektion_dato             DateTime        @db.Date
+  hold_id                  String          @db.Uuid
+  rytter_id                String          @db.Uuid
+  hest_id                  String?         @db.Uuid
+  status                   FremmoedeStatus
+  /// Kun ved afbud (R10).
+  modtaget_tidspunkt       DateTime?       @db.Timestamptz(6)
+  registreret_af_bruger_id String?         @db.Uuid
+  registreret_af_navn      String
+  klient_tidspunkt         DateTime        @db.Timestamptz(6)
+  server_tidspunkt         DateTime        @default(now()) @db.Timestamptz(6)
+  enhed_id                 String?         @db.Uuid
+  erstatter_id             String?         @db.Uuid
+  /// Påkrævet når erstatter_id er sat, mindst 5 tegn (CHECK i migrationen).
+  korrektions_begrundelse  String?
+  kommando_id              String          @unique @db.Uuid
+  forrige_hash             String
+  hash                     String
+
+  lektionsplads LektionsPlads           @relation(fields: [lektionsplads_id], references: [id])
+  enhed         Enhed?                  @relation(fields: [enhed_id], references: [id])
+  erstatter     Fremmoederegistrering?  @relation("Korrektion", fields: [erstatter_id], references: [id])
+  erstattet_af  Fremmoederegistrering[] @relation("Korrektion")
+
+  @@index([lektionsplads_id])
+  @@index([lektion_dato])
+  @@map("fremmoederegistrering")
+}
+
+enum OmplaceringsAarsag {
+  HestSyg
+  HestSkadet
+  Adfaerd
+  Andet
+}
+
+/// 🧾 Append-only ⛓ hashkæde.
+model Omplacering {
+  id                    String             @id @default(uuid()) @db.Uuid
+  lektionsplads_id      String             @db.Uuid
+  fra_hest_id           String             @db.Uuid
+  /// Skal bestå Welfare Guard på tidspunktet.
+  til_hest_id           String             @db.Uuid
+  aarsag                OmplaceringsAarsag
+  forslag_snapshot      Json
+  godkendt_af_bruger_id String?            @db.Uuid
+  godkendt_af_navn      String
+  klient_tidspunkt      DateTime           @db.Timestamptz(6)
+  server_tidspunkt      DateTime           @default(now()) @db.Timestamptz(6)
+  kommando_id           String             @unique @db.Uuid
+
+  lektionsplads LektionsPlads @relation(fields: [lektionsplads_id], references: [id])
+
+  @@map("omplacering")
+}
+
+// ---------------------------------------------------------------- Venteliste og genbesættelse
+
+enum VentelisteStatus {
+  Aktiv
+  Forslag_genereret
+  Optaget
+  Afslaaet
+}
+
+model Venteliste {
+  id              String           @id @default(uuid()) @db.Uuid
+  rytter_id       String           @db.Uuid
+  /// Enten hold eller niveau skal være sat (CHECK i migrationen).
+  oensket_hold_id String?          @db.Uuid
+  oensket_niveau  Niveau?
+  /// FIFO-rækkefølge.
+  tilmeldingsdato DateTime         @default(now()) @db.Date
+  status          VentelisteStatus @default(Aktiv)
+
+  rytter  Rytter                   @relation(fields: [rytter_id], references: [id])
+  forslag Genbesaettelsesforslag[]
+
+  @@map("venteliste")
+}
+
+enum GenbesaettelseType {
+  Enkeltlektion
+  FastPlads
+}
+
+enum GenbesaettelseStatus {
+  Afventer
+  Godkendt
+  Afvist
+  Udloebet
+}
+
+model Genbesaettelsesforslag {
+  id                       String               @id @default(uuid()) @db.Uuid
+  type                     GenbesaettelseType
+  lektion_id               String?              @db.Uuid
+  hold_id                  String?              @db.Uuid
+  ledig_fra                DateTime?            @db.Date
+  frigjort_hest_id         String?              @db.Uuid
+  /// Den øverste kvalificerede kandidat.
+  foreslaaet_venteliste_id String               @db.Uuid
+  /// Navn og telefon til Malenes manuelle kontakt.
+  kontaktinfo_snapshot     Json
+  status                   GenbesaettelseStatus @default(Afventer)
+  behandlet_af             String?              @db.Uuid
+  behandlet_tidspunkt      DateTime?            @db.Timestamptz(6)
+
+  venteliste Venteliste @relation(fields: [foreslaaet_venteliste_id], references: [id])
+
+  @@map("genbesaettelsesforslag")
+}
+
+// ---------------------------------------------------------------- Kommunal rapport
+
+enum RapportFormat {
+  CSV
+  HTML
+}
+
+/// 🧾 Append-only.
+model RapportUdtraek {
+  id                  String        @id @default(uuid()) @db.Uuid
+  periode_fra         DateTime      @db.Date
+  periode_til         DateTime      @db.Date
+  /// Tilskudskriterium: under 25 år ved rapportperiodens start.
+  aldersgraense       Int           @default(25)
+  format              RapportFormat
+  antal_raekker       Int
+  fil_sha256          String
+  kaede_hovedhash     String
+  genereret_af        String        @db.Uuid
+  genereret_tidspunkt DateTime      @default(now()) @db.Timestamptz(6)
+  varighed_ms         Int
+
+  genereret_af_bruger Bruger @relation(fields: [genereret_af], references: [id])
+
+  @@map("rapport_udtraek")
 }

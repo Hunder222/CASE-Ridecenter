@@ -13,20 +13,31 @@ const SessionIndhold = z.object({
   navn: z.string(),
   roller: z.array(Rolle).min(1),
   udloeber: z.iso.datetime(),
+  /** Sat ved PIN-login og vikarlogin på en betroet stald-enhed. */
+  enhed_id: z.uuid().optional(),
 });
 export type SessionIndhold = z.infer<typeof SessionIndhold>;
+
+export interface SessionValg {
+  enhed_id?: string;
+  /** Overstyrer standardvarigheden (8 timer), f.eks. til stald-sessioner. */
+  udloeber?: Date;
+}
 
 export function opretSession(
   reply: FastifyReply,
   bruger: { id: string; navn: string; roller: Rolle[] },
   nu: Date,
   sikkerCookie: boolean,
+  valg: SessionValg = {},
 ): SessionIndhold {
+  const udloeb = valg.udloeber ?? new Date(nu.getTime() + VARIGHED_MS);
   const session: SessionIndhold = {
     bruger_id: bruger.id,
     navn: bruger.navn,
     roller: bruger.roller,
-    udloeber: new Date(nu.getTime() + VARIGHED_MS).toISOString(),
+    udloeber: udloeb.toISOString(),
+    ...(valg.enhed_id ? { enhed_id: valg.enhed_id } : {}),
   };
   reply.setCookie(SESSION_COOKIE, JSON.stringify(session), {
     signed: true,
@@ -34,7 +45,7 @@ export function opretSession(
     sameSite: 'lax',
     secure: sikkerCookie,
     path: '/',
-    maxAge: VARIGHED_MS / 1000,
+    maxAge: Math.max(1, Math.floor((udloeb.getTime() - nu.getTime()) / 1000)),
   });
   return session;
 }

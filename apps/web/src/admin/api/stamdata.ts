@@ -48,6 +48,55 @@ export function useHold() {
   return useQuery({ queryKey: stamdataNoegler.hold, queryFn: () => api<Hold[]>('/hold') });
 }
 
+export function useOpretHold() {
+  const queryKlient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: any) => api<Hold>('/hold', { metode: 'POST', body: input }),
+    onSuccess: () => queryKlient.invalidateQueries({ queryKey: stamdataNoegler.hold }),
+  });
+}
+
+export function useOpdaterHold() {
+  const queryKlient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, aendring }: { id: string; aendring: any }) =>
+      api<Hold>(`/hold/${id}`, { metode: 'PATCH', body: aendring }),
+    onSuccess: () => queryKlient.invalidateQueries({ queryKey: stamdataNoegler.hold }),
+  });
+}
+
+export function useHoldTilmeldinger(holdId: string | undefined) {
+  return useQuery({
+    queryKey: ['hold', holdId, 'tilmeldinger'] as const,
+    queryFn: () => api<any[]>(`/hold/${holdId}/tilmeldinger`),
+    enabled: Boolean(holdId),
+  });
+}
+
+export function useOpretTilmelding(holdId: string) {
+  const queryKlient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: any) =>
+      api<any>(`/hold/${holdId}/tilmeldinger`, { metode: 'POST', body: input }),
+    onSuccess: () => {
+      queryKlient.invalidateQueries({ queryKey: ['hold', holdId, 'tilmeldinger'] });
+      queryKlient.invalidateQueries({ queryKey: stamdataNoegler.hold });
+    },
+  });
+}
+
+export function useAfmeldTilmelding(holdId: string) {
+  const queryKlient = useQueryClient();
+  return useMutation({
+    mutationFn: (tilmeldingId: string) =>
+      api<any>(`/hold/${holdId}/tilmeldinger/${tilmeldingId}`, { metode: 'DELETE' }),
+    onSuccess: () => {
+      queryKlient.invalidateQueries({ queryKey: ['hold', holdId, 'tilmeldinger'] });
+      queryKlient.invalidateQueries({ queryKey: stamdataNoegler.hold });
+    },
+  });
+}
+
 export function useRyttere() {
   return useQuery({ queryKey: stamdataNoegler.ryttere, queryFn: () => api<Rytter[]>('/ryttere') });
 }

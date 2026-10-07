@@ -1,0 +1,112 @@
+import { z } from 'zod';
+import { Dato, Niveau, Sundhedsstatus, Temperament, Tidspunkt, Uuid } from './faelles';
+
+// Stald-DTO'er (data-model.md §9, research R6/R8). De indeholder ALDRIG vaegt_kg, hoejde_cm, foedselsdato,
+// kontakt_*, faldtraume_note, angstkategori, forbudte_heste eller paakraevede_heste (Princip IV).
+
+export const FremmoedeStatus = z.enum(['Fremmoedt', 'Afbud_rettidigt', 'Afbud_for_sent', 'Udeblevet']);
+export type FremmoedeStatus = z.infer<typeof FremmoedeStatus>;
+
+export const StaldPlads = z.object({
+  id: Uuid,
+  /** Fornavn + efternavnsinitial (dataminimering). */
+  rytter_navn_kort: z.string(),
+  planlagt_hest_id: Uuid.nullable(),
+  aktuel_hest_id: Uuid.nullable(),
+  afledt_status: FremmoedeStatus.nullable(),
+  /** Afledt liste (R6). Aldrig årsagen til, at en hest mangler. */
+  godkendte_heste: z.array(Uuid),
+  cheat_sheet_koder: z.array(z.string()),
+  /** Anonymiseret og dekrypteret instruks (højst 200 tegn). */
+  adfaerdsinstruks: z.string().nullable(),
+});
+export type StaldPlads = z.infer<typeof StaldPlads>;
+
+export const StaldHold = z.object({
+  id: Uuid,
+  hold_id: Uuid,
+  dato: Dato,
+  holdnavn: z.string(),
+  niveau: Niveau,
+  er_springhold: z.boolean(),
+  starttid: z.string(),
+  varighed_min: z.number().int(),
+  underviser_navn: z.string(),
+  fremmoede_lukket: Tidspunkt.nullable(),
+  pladser: z.array(StaldPlads),
+});
+export type StaldHold = z.infer<typeof StaldHold>;
+
+export const StaldDag = z.object({
+  dato: Dato,
+  lektioner: z.array(StaldHold),
+});
+export type StaldDag = z.infer<typeof StaldDag>;
+
+export const HestStaldInfo = z.object({
+  id: Uuid,
+  navn: z.string(),
+  stangmaal_cm: z.number().int(),
+  temperament: Temperament,
+  sundhedsstatus: Sundhedsstatus,
+  staldnoter: z.string(),
+  hviledag: z.number().int().min(1).max(7),
+  max_lektioner_dag: z.number().int(),
+  spring_brugt_uge: z.number().int(),
+});
+export type HestStaldInfo = z.infer<typeof HestStaldInfo>;
+
+export const EnhedRegistrerBody = z.strictObject({ enrollment_token: z.string().min(1) });
+export type EnhedRegistrerBody = z.infer<typeof EnhedRegistrerBody>;
+
+export const EnhedUdstedBody = z.strictObject({ navn: z.string().min(1).max(100) });
+export type EnhedUdstedBody = z.infer<typeof EnhedUdstedBody>;
+
+export const PinLoginBody = z.strictObject({ pin: z.string().regex(/^[0-9]{4}$/, 'PIN skal være 4 cifre') });
+export type PinLoginBody = z.infer<typeof PinLoginBody>;
+
+export const VikarLoginBody = z.strictObject({
+  vikarkode: z.string().regex(/^[0-9]{6}$/, 'Vikarkoden skal være 6 cifre'),
+  fulde_navn: z.string().trim().min(3, 'Skriv dit fulde navn'),
+});
+export type VikarLoginBody = z.infer<typeof VikarLoginBody>;
+
+export const FremmoedeBatchBody = z.strictObject({
+  lektion_id: Uuid,
+  registreringer: z
+    .array(
+      z.strictObject({
+        lektionsplads_id: Uuid,
+        status: z.enum(['Fremmoedt', 'Udeblevet']),
+      }),
+    )
+    .min(1),
+});
+export type FremmoedeBatchBody = z.infer<typeof FremmoedeBatchBody>;
+
+export const FremmoedeKorrektionBody = z.strictObject({
+  ny_status: FremmoedeStatus,
+  begrundelse: z.string().trim().min(5, 'Begrundelsen skal være mindst 5 tegn'),
+});
+export type FremmoedeKorrektionBody = z.infer<typeof FremmoedeKorrektionBody>;
+
+export const FremmoedePost = z.object({
+  id: Uuid,
+  lektionsplads_id: Uuid,
+  lektion_dato: Dato,
+  hold_id: Uuid,
+  rytter_id: Uuid,
+  hest_id: Uuid.nullable(),
+  status: FremmoedeStatus,
+  modtaget_tidspunkt: Tidspunkt.nullable(),
+  registreret_af_navn: z.string(),
+  klient_tidspunkt: Tidspunkt,
+  server_tidspunkt: Tidspunkt,
+  erstatter_id: Uuid.nullable(),
+  korrektions_begrundelse: z.string().nullable(),
+  kommando_id: Uuid,
+  forrige_hash: z.string(),
+  hash: z.string(),
+});
+export type FremmoedePost = z.infer<typeof FremmoedePost>;
+

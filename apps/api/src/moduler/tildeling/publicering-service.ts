@@ -89,7 +89,7 @@ export async function publicerKoersel(
     prHold.set(t.holdtilmelding.hold_id, [...(prHold.get(t.holdtilmelding.hold_id) ?? []), t]);
   }
 
-  return app.prisma.$transaction(
+  const resultat = await app.prisma.$transaction(
     async (tx) => {
       const tidligere = await tx.tildelingskoersel.findFirst({
         where: { maaned: koersel.maaned, status: 'Publiceret', NOT: { id } },
@@ -157,4 +157,12 @@ export async function publicerKoersel(
     },
     { timeout: 60_000 },
   );
+
+  app.sse?.udsendEvent('lektioner.publiceret', {
+    koersel_id: id,
+    maaned: koersel.maaned,
+    antal_lektioner: resultat.antal_lektioner,
+  });
+
+  return resultat;
 }

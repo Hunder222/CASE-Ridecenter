@@ -2,3 +2,5 @@
 export * from './faelles';
 export * from './stamdata';
 export * from './kabale';
+export * from './stald';
+export * from './sync';

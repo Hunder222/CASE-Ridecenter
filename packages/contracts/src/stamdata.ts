@@ -64,6 +64,46 @@ export const Hold = z.object({
 });
 export type Hold = z.infer<typeof Hold>;
 
+export const HoldInput = z.strictObject({
+  holdnavn: z.string().trim().min(1, 'Holdnavn skal udfyldes'),
+  niveau: Niveau,
+  er_springhold: z.boolean().default(false),
+  ugedag: Ugedag,
+  starttid: z.string().regex(/^[0-2][0-9]:[0-5][0-9]$/, 'Starttid skal være i formatet HH:MM'),
+  varighed_min: Heltal.min(30, 'Varighed skal være mindst 30 min').max(60, 'Varighed må højst være 60 min'),
+  max_kapacitet: Heltal.min(1, 'Kapacitet skal være mindst 1').max(10, 'Kapacitet må højst være 10'),
+  fast_underviser_id: Uuid,
+});
+export type HoldInput = z.infer<typeof HoldInput>;
+
+export const HoldOpdatering = HoldInput.partial();
+export type HoldOpdatering = z.infer<typeof HoldOpdatering>;
+
+export const HoldtilmeldingInput = z.strictObject({
+  rytter_id: Uuid,
+  gyldig_fra: Dato.optional(),
+  ancienitet_dato: Dato.optional(),
+});
+export type HoldtilmeldingInput = z.infer<typeof HoldtilmeldingInput>;
+
+export const Holdtilmelding = z.object({
+  id: Uuid,
+  rytter_id: Uuid,
+  hold_id: Uuid,
+  gyldig_fra: Dato,
+  gyldig_til: Dato.nullable(),
+  ancienitet_dato: Dato,
+  rytter_navn: z.string().optional(),
+});
+export type Holdtilmelding = z.infer<typeof Holdtilmelding>;
+
+export const StaldOenskerBatchBody = z.strictObject({
+  rytter_id: Uuid,
+  maaned: z.string().regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/, 'Måned skal være i formatet YYYY-MM'),
+  oensker: z.array(Uuid).min(1, 'Vælg mindst 1 ønske').max(3, 'Vælg højst 3 ønsker'),
+});
+export type StaldOenskerBatchBody = z.infer<typeof StaldOenskerBatchBody>;
+
 // ---------------------------------------------------------------- Ryttere (FR-002, kun Ledelse)
 
 /** Admin-projektion. Må aldrig sendes til andre roller end Ledelse. */

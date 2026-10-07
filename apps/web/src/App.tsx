@@ -1,6 +1,7 @@
 import { createBrowserRouter, Link, Navigate, RouterProvider } from 'react-router';
 import { AdminLayout } from './admin/AdminLayout';
 import { HesteSide } from './admin/heste/HesteSide';
+import { HoldSide } from './admin/HoldSide';
 import { KabaleSide } from './admin/kabale/KabaleSide';
 import { LoginSide } from './admin/LoginSide';
 import { NotifikationerSide } from './admin/notifikationer/NotifikationerSide';
@@ -10,6 +11,11 @@ import { RyttereSide } from './admin/ryttere/RyttereSide';
 import { SikkerhedsprofilSide } from './admin/ryttere/SikkerhedsprofilSide';
 import { naesteMaaned } from './faelles/maaned';
 import { KraevRolle } from './faelles/session';
+import { IDagSide } from './stald/IDagSide';
+import { LaasSide } from './stald/LaasSide';
+import { LektionSide } from './stald/LektionSide';
+import { OenskerLektionSide } from './stald/OenskerLektionSide';
+import { StaldLayout } from './stald/StaldLayout';
 
 function IkkeFundet() {
   return (
@@ -37,6 +43,7 @@ const router = createBrowserRouter([
       { path: 'kabale/:maaned', element: <KabaleSide /> },
       { path: 'oensker/:maaned', element: <OenskerSide /> },
       { path: 'heste', element: <HesteSide /> },
+      { path: 'hold', element: <HoldSide /> },
       {
         path: 'ryttere',
         element: (
@@ -71,13 +78,17 @@ const router = createBrowserRouter([
       },
     ],
   },
+  { path: '/stald/laas', element: <LaasSide /> },
   {
-    path: '/stald/*',
-    element: (
-      <main className="mx-auto max-w-3xl p-8">
-        <h1 className="text-2xl font-semibold">Staldfladen kommer i Fase 2</h1>
-      </main>
-    ),
+    path: '/stald',
+    element: <StaldLayout />,
+    children: [
+      { index: true, element: <Navigate to="/stald/hold" replace /> },
+      { path: 'i-dag', element: <IDagSide /> },
+      { path: 'hold', element: <IDagSide /> },
+      { path: 'lektion/:id', element: <LektionSide /> },
+      { path: 'oensker/:lektionId', element: <OenskerLektionSide /> },
+    ],
   },
   { path: '*', element: <IkkeFundet /> },
 ]);

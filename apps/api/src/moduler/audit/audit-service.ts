@@ -18,7 +18,14 @@ export type AuditHandling =
   | 'SIKKERHEDSPROFIL_AENDRET'
   | 'TILDELING_JUSTERET'
   | 'TILDELING_GODKENDT'
-  | 'TILDELING_PUBLICERET';
+  | 'TILDELING_PUBLICERET'
+  | 'LOGIN_PIN'
+  | 'ENHED_UDSTEDT'
+  | 'ENHED_REGISTRERET'
+  | 'FREMMOEDE_KORRIGERET'
+  | 'OENSKER_REGISTRERET'
+  | 'SYNK_CLOCK_SKEW'
+  | 'SYNK_KONFLIKT';
 
 type JsonObjekt = Record<string, unknown>;
 
@@ -34,6 +41,10 @@ export interface NyHaendelse {
   begrundelse?: string | null;
   /** Felter, der kun må logges som "ændret" (krypterede art. 9-felter). */
   krypteredeFelter?: readonly string[];
+  /** Enheden, handlingen kom fra (stald-tablet). */
+  enhed_id?: string | null;
+  klient_tidspunkt?: Date | null;
+  kommando_id?: string | null;
 }
 
 /** De felter, der indgår i hashen. Bruges også til at verificere kæden ud fra gemte rækker. */
@@ -127,8 +138,8 @@ export async function logHaendelse(tx: Prisma.TransactionClient, h: NyHaendelse)
   const indhold: HashIndhold = {
     id: randomUUID(),
     server_tidspunkt: h.tidspunkt.toISOString(),
-    klient_tidspunkt: null,
-    enhed_id: null,
+    klient_tidspunkt: h.klient_tidspunkt?.toISOString() ?? null,
+    enhed_id: h.enhed_id ?? null,
     bruger_id: h.bruger?.id ?? null,
     bruger_navn: h.bruger?.navn ?? 'System',
     rolle: h.bruger ? primaerRolle(h.bruger) : 'System',
@@ -138,7 +149,7 @@ export async function logHaendelse(tx: Prisma.TransactionClient, h: NyHaendelse)
     foer: skjulKrypterede(h.foer, felter),
     efter: skjulKrypterede(h.efter, felter),
     begrundelse: h.begrundelse ?? null,
-    kommando_id: null,
+    kommando_id: h.kommando_id ?? null,
   };
   const hash = beregnHash(forrigeHash, indhold);
 
@@ -146,7 +157,7 @@ export async function logHaendelse(tx: Prisma.TransactionClient, h: NyHaendelse)
     data: {
       ...indhold,
       server_tidspunkt: h.tidspunkt,
-      klient_tidspunkt: null,
+      klient_tidspunkt: h.klient_tidspunkt ?? null,
       foer: (indhold.foer as Prisma.InputJsonValue | null) ?? Prisma.DbNull,
       efter: (indhold.efter as Prisma.InputJsonValue | null) ?? Prisma.DbNull,
       forrige_hash: forrigeHash,

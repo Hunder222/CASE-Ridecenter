@@ -1,29 +1,27 @@
 ---
-description: "Opgaveliste for 001-holdadministration-mvp: Fase 1 PoC (User Story 2, Kabalen) som komplet vertikal skive + Fase 2 resterende system"
+description: "Opgaveliste for 001-holdadministration-mvp: Fase 1 PoC (User Story 2, Kabalen) [Valideret] + Fase 2 Resterende system (US1, US3, US4, stald-fundament, offline og pitch-klargøring)"
 ---
 
-# Tasks: Digital Holdadministration & Ressourcestyring – PoC af Kabalen (User Story 2)
+# Tasks: Digital Holdadministration & Ressourcestyring (MVP)
 
 **Input**: Designdokumenter fra `specs/001-holdadministration-mvp/` (plan.md, spec.md, data-model.md, research.md, quickstart.md, contracts/)
 
-**Forudsætninger**: plan.md og spec.md (påkrævet), data-model.md, contracts/domain-engine.md, contracts/openapi.yaml, contracts/ui-routes.md, research.md (R1–R15)
+**Forudsætninger**: plan.md og spec.md (påkrævet), data-model.md, contracts/domain-engine.md, contracts/openapi.yaml, contracts/ui-routes.md, contracts/sync-protocol.md, research.md (R1–R15)
 
 **Forfatning**: `.specify/memory/constitution.md` v1.2.0. Princip I (ingen override af HC nogen steder), II (spærringer er data), III (append-only revisionsspor), IV (Art. 9 adskilt og krypteret), V (SSoT)
 
-**Tests**: Inkluderet. De er eksplicit krævet af plan.md (R12, hypotese H2), contracts/domain-engine.md §5 ("Alle skal være grønne, før en kørsel kan publiceres") og quickstart.md §3 og §6 (Definition of Done). Testopgaverne i 1.3 skrives først og skal fejle, før implementeringen i 1.4–1.6 starter.
+**Tests**: Inkluderet for alle user stories og valideringsscenarier (V1–V10). Testene skrives først inden for hver sektion og skal fejle, før implementeringen starter.
 
-**Organisering** (efter brugerens ønske):
+**Organisering**:
 
-- **Fase 1: PoC (User Story 2)** er en komplet vertikal skive for Kabalen: database → domænemotor → REST-API → web-admin → tests, benchmark og E2E. Kun denne fase har detaljerede, eksekverbare opgaver (T001–T104).
-- **Fase 2: Resterende system** dækker US1, US3, US4, resten af fundamentet (stald, offline, PIN) og pitch-klargøring (S5). Den er beskrevet som arbejdspakker uden opgave-ID'er og detaljeres med en ny `/speckit-tasks`-kørsel, når PoC'en er valideret.
-
-**Afvigelse fra plan.md**: Planens snit-rækkefølge er S0 → S1 (US1) → S2 (US2). Her bygges S2 først som PoC, og kun de dele af S0, som US2 kræver (monorepo, PostgreSQL, Prisma, web-login, RBAC, kryptering, audit og seed). PWA/offline, PIN-login og enheder er flyttet til Fase 2.
+- **Fase 1: PoC (User Story 2, Kabalen)** er gennemført og valideret (T001–T104) som komplet vertikal skive.
+- **Fase 2: Resterende system (US1, US3, US4, stald-fundament og pitch-klargøring)** dækker T105–T177 organiseret i prioriterede faser (2.1 Stald-fundament, 2.2 US1 P1, 2.3 US2 P2, 2.4 US3 P3, 2.5 US4 P4, 2.6 Polish & pitch-klar).
 
 ## Format: `[ID] [P?] [Story] Beskrivelse`
 
 - **[P]**: Kan køre parallelt (andre filer, ingen afhængighed af ufærdige opgaver)
-- **[US2]**: Opgaven hører til User Story 2 (Kabalen)
-- Setup-, fundament- og valideringsopgaver har ingen story-label
+- **[US1]**, **[US2]**, **[US3]**, **[US4]**: Opgaven hører til den respektive User Story fra spec.md
+- Setup-, fundament-, validerings- og polish-opgaver har ingen story-label
 - Alle stier er relative til repo-roden
 
 ## Stikonventioner (fra plan.md, Project Structure)
@@ -228,124 +226,286 @@ description: "Opgaveliste for 001-holdadministration-mvp: Fase 1 PoC (User Story
 
 ---
 
-# Fase 2: Resterende system
+# Fase 2: Resterende system (US1, US3, US4, Stald-fundament & Pitch-klargøring)
 
-**Status**: Ikke detaljeret med vilje. Pakkerne nedenfor har ingen opgave-ID'er eller afkrydsningsbokse, så `/speckit-implement` ikke tager dem med. Kør `/speckit-tasks` igen for Fase 2, når Fase 1 er valideret. Pakkerne følger planens snit S0 (resten), S1, S3, S4 og S5.
+**Mål**: Komplettering af hele ridecentersystemet jf. plan.md (S0-resten, S1, S3, S4, S5). Gør staldfladen (`/stald`) tilgængelig som offline-first PWA med PIN-login (< 2 sek.), batch-afkrydsning af hold (< 15 sek.), akut top-3 hesteerstatning (< 2 sek.), vikaroverlevering med Cheat Sheet (GDPR Art. 9 anonymiseret uden diagnoser), automatisk håndtering af afbud før/efter kl. 12:00 med ventelisteforslag (< 5 sek.), realtids ledelsesdashboard samt 1-klik revisionssikker kommunal tilsynsrapport (< 5 sek.) verificerbar mod uforanderlig hashkæde.
 
-| Pakke | Indhold | Stories / krav | Afhænger af | Valideres af |
-|---|---|---|---|---|
-| **F2-A Stald-fundament og offline** | Enhed (enrollment-token, `X-Enhed-Noegle`, FK på `audit_haendelse.enhed_id`). PIN-login (Argon2id på serveren, PBKDF2-cache på enheden, spærring efter 5 fejl i 60 sek.) og `pin_hash` i seed. `vite-plugin-pwa` (kun `/stald/*` caches). Dexie-stores fra data-model §9. Outbox, `POST /sync/push` (idempotent), `GET /sync/pull`. `GET /stald/dag/{dato}` med `godkendte_heste` (R6). SSE `GET /events`. Synkindikator og autolås efter 5 min. | FR-004, FR-005, sync-protocol §1–§9 | Fase 1 | V1 (delvist), V9 |
-| **F2-B US1 Fremmøde (P1)** | `Fremmoederegistrering` 🧾⛓ med append-only-trigger. `RegistrerFremmoede` (batch), "Afslut hold" og automatisk lukning 30 min. efter lektionens slut, `KorrigerFremmoede` med begrundelse (mindst 5 tegn), felt-LWW og `SYNK_KONFLIKT`. Ruterne `/stald/laas`, `/stald/i-dag`, `/stald/lektion/:id` og `/stald/plads/:id/korriger` samt `POST /fremmoede/{id}/korrektion` | US1 AS1–AS6, FR-017, SC-001, SC-008 | F2-A | V1, V10 |
-| **F2-C US2-rester** | Stald-varianten af ønsker (`RegistrerOensker`, `/stald/oensker/:lektionId`). `/admin/hold` med `POST /hold` og `POST /hold/{id}/tilmeldinger` (409 `HOLD_FULDT`). Publicering skubbes til enheder via SSE og pull | F1.1, US2 (V2 trin 8) | F2-A | V2 |
-| **F2-D US3 Akut drift (P3)** | `Hestestatusmelding` 🧾 og `MeldHestStatus` (fail-safe), `/stald/heste`. `foreslaaErstatninger` (top-3, offline) i domænepakken og `GET /lektionspladser/{id}/erstatningsforslag`. `GodkendOmplacering` med Welfare Guard på serveren og `Omplacering` 🧾⛓. `CheatSheetKode` samt `cheat_sheet_koder` og `adfaerdsinstruks` 🔒 på sikkerhedsprofilen med valideringen `INSTRUKS_INDEHOLDER_DIAGNOSE`, `/stald/lektion/:id/cheat-sheet`. Vikarkoder (`/admin/vikarkoder`, udsted og spær), `VikarLogin` og notifikation | US3 AS1–AS6, FR-011 – FR-013, SC-005, SC-007 | F2-A, F2-B | V3, V4, V9 |
-| **F2-E US4 Ledelse (P4)** | `klassificerAfbud` (kl. 12:00), `RegistrerAfbud` og `POST /lektioner/{id}/afbud`. `Venteliste`, `Genbesaettelsesforslag` og `rangerVenteliste`. Opsigelse (`beregnOpsigelsesSlutdato`, `FastPlads`). Dashboardet `/admin` med nøgletal, heatmap og gentaget fravær. Kommunerapport (CSV med BOM og semikolon + HTML, SHA-256 og kædehash) og `RapportUdtraek` 🧾. `/admin/audit` og `POST /audit/verificer`. `demo:tid` og `demo:manipuler` | US4 AS1–AS6, FR-014 – FR-016, FR-018, SC-006, SC-009 | F2-B | V5–V8 |
-| **F2-F Pitch-klar (S5)** | Seed `fuld` i databasen, EU-PaaS-deploy over HTTPS med kun fiktive data, pitch-drejebogen på en rigtig tablet, målinger samlet til slides og den fulde Definition of Done | alle | F2-A – F2-E | quickstart §5–§6 |
+**Forudsætninger**: Fase 1 (T001–T104) er gennemført og valideret (se `specs/001-holdadministration-mvp/checklists/poc-fase1.md`).
 
-Tværgående i Fase 2: append-only-triggeren `afvis_mutation()` på alle nye 🧾-tabeller, kontrakttests for alle endpoints, RBAC-scan af alle stald-svar (V9) og CI, der kører V1–V10.
+---
+
+## 2.1 Stald-fundament og offline-infrastruktur (F2-A)
+
+**Formål**: Database-udvidelser for stald & enheder, PIN- og enhedssikkerhed, Dexie 4 offline storage, Service Worker PWA-caching samt Server-Sent Events og offline sync-motor (blocking for alle stald-stories).
+
+**⚠️ KRITISK**: Ingen af stald-brugerhistorierne (US1, US2-stald, US3) kan fungere på enheden, før dette fundament er etableret.
+
+- [X] T105 Udvælg og tilføj Fase 2 datamodeller i `apps/api/prisma/schema.prisma` jf. `data-model.md`:
+  - Model `Enhed` (`enhed`): `id String @id @default(uuid()) @db.Uuid`, `navn String`, `enrollment_token_hash String`, `enhedsnoegle_hash String?`, `aktiv Boolean @default(true)` ("en deaktiveret enhed afvises ved sync og login"), `sidst_synkroniseret DateTime? @db.Timestamptz(6)`
+  - Model `VikarEngangskode` (`vikar_engangskode`): `id String @id @default(uuid()) @db.Uuid`, `kode_hash String` ("6-cifret kode (R7). Klartekst vises kun én gang ved udstedelse"), `udstedt_af String @db.Uuid`, `udstedt_dato DateTime @default(now()) @db.Timestamptz(6)`, `udloebsdato DateTime @db.Timestamptz(6)` ("standardudløb 90 dage"), `anvendt_dato DateTime? @db.Timestamptz(6)`, `anvendt_af_vikarnavn String?` ("påkrævet ved brug"), `anvendt_paa_enhed String? @db.Uuid`, enum `VikarKodeStatus {Aktiv, Anvendt, Udloebet, Spaerret}`, `status VikarKodeStatus @default(Aktiv)`
+  - Model `Hestestatusmelding` (`hestestatusmelding`, 🧾): `id String @id @default(uuid()) @db.Uuid`, `hest_id String @db.Uuid`, enum `StatusMeldingType {Helbred, Adfaerd}`, `type StatusMeldingType`, enum `Alvorlighed {Info, Obs, KanIkkeBruges}`, `alvorlighed Alvorlighed` ("KanIkkeBruges sætter straks Hest.sundhedsstatus = Sygemeldt"), `beskrivelse String` ("≤ 500 tegn, kun om hesten"), `meldt_af_bruger_id String? @db.Uuid`, `meldt_af_navn String`, `klient_tidspunkt DateTime @db.Timestamptz(6)`, `server_tidspunkt DateTime @default(now()) @db.Timestamptz(6)`, `kommando_id String @unique @db.Uuid`
+  - Model `CheatSheetKode` (`cheat_sheet_kode`): `kode String @id`, `tekst String`, enum `CheatSheetKategori {Haandtering, Afstand, Opstigning, Kommunikation}`, `kategori CheatSheetKategori`
+  - Opdatér model `Sikkerhedsprofil` med `cheat_sheet_koder String[] @default([])` og `adfaerdsinstruks String?` (🔒 AES-256-GCM, format `v1:<iv>:<tag>:<data>`, "anonymiseret, ≤ 200 tegn. Valideres mod forbudte diagnosebetegnelser")
+  - Model `Fremmoederegistrering` (`fremmoederegistrering`, 🧾 ⛓): `id String @id @default(uuid()) @db.Uuid`, `lektionsplads_id String @db.Uuid`, `lektion_dato DateTime @db.Date`, `hold_id String @db.Uuid`, `rytter_id String @db.Uuid`, `hest_id String? @db.Uuid`, enum `FremmoedeStatus {Fremmoedt, Afbud_rettidigt, Afbud_for_sent, Udeblevet}`, `status FremmoedeStatus`, `modtaget_tidspunkt DateTime? @db.Timestamptz(6)`, `registreret_af_bruger_id String? @db.Uuid`, `registreret_af_navn String`, `klient_tidspunkt DateTime @db.Timestamptz(6)`, `server_tidspunkt DateTime @default(now()) @db.Timestamptz(6)`, `enhed_id String? @db.Uuid`, `erstatter_id String? @db.Uuid`, `korrektions_begrundelse String?` ("påkrævet når erstatter_id er sat, mindst 5 tegn"), `kommando_id String @unique @db.Uuid`, `forrige_hash String`, `hash String`
+  - Model `Omplacering` (`omplacering`, 🧾 ⛓): `id String @id @default(uuid()) @db.Uuid`, `lektionsplads_id String @db.Uuid`, `fra_hest_id String @db.Uuid`, `til_hest_id String @db.Uuid` ("til_hest skal bestå Welfare Guard på tidspunktet"), enum `OmplaceringsAarsag {HestSyg, HestSkadet, Adfaerd, Andet}`, `aarsag OmplaceringsAarsag`, `forslag_snapshot Json`, `godkendt_af_bruger_id String? @db.Uuid`, `godkendt_af_navn String`, `klient_tidspunkt DateTime @db.Timestamptz(6)`, `server_tidspunkt DateTime @default(now()) @db.Timestamptz(6)`, `kommando_id String @unique @db.Uuid`
+  - Model `Venteliste` (`venteliste`): `id String @id @default(uuid()) @db.Uuid`, `rytter_id String @db.Uuid`, `oensket_hold_id String? @db.Uuid`, `oensket_niveau Niveau?`, `tilmeldingsdato DateTime @default(now()) @db.Date`, enum `VentelisteStatus {Aktiv, Forslag_genereret, Optaget, Afslaaet}`, `status VentelisteStatus @default(Aktiv)`
+  - Model `Genbesaettelsesforslag` (`genbesaettelsesforslag`): `id String @id @default(uuid()) @db.Uuid`, enum `GenbesaettelseType {Enkeltlektion, FastPlads}`, `type GenbesaettelseType`, `lektion_id String? @db.Uuid`, `hold_id String? @db.Uuid`, `ledig_fra DateTime? @db.Date`, `frigjort_hest_id String? @db.Uuid`, `foreslaaet_venteliste_id String @db.Uuid`, `kontaktinfo_snapshot Json`, enum `GenbesaettelseStatus {Afventer, Godkendt, Afvist, Udloebet}`, `status GenbesaettelseStatus @default(Afventer)`, `behandlet_af String? @db.Uuid`, `behandlet_tidspunkt DateTime? @db.Timestamptz(6)`
+  - Model `RapportUdtraek` (`rapport_udtraek`, 🧾): `id String @id @default(uuid()) @db.Uuid`, `periode_fra DateTime @db.Date`, `periode_til DateTime @db.Date`, `aldersgraense Int @default(25)` ("tilskudskriterium: under 25 år ved rapportperiodens start"), enum `RapportFormat {CSV, HTML}`, `format RapportFormat`, `antal_raekker Int`, `fil_sha256 String`, `kaede_hovedhash String`, `genereret_af String @db.Uuid`, `genereret_tidspunkt DateTime @default(now()) @db.Timestamptz(6)`, `varighed_ms Int`
+  - Tilføj relation i `AuditHaendelse`: `enhed_id String? @db.Uuid` med `enhed Enhed? @relation(fields: [enhed_id], references: [id])`
+- [X] T106 Opret migration og håndskrevne SQL-triggere og constraints i `apps/api/prisma/migrations/<tidsstempel>_fase2_init/migration.sql`:
+  - (a) Bind append-only trigger `afvis_mutation()` til `fremmoederegistrering`, `omplacering`, `hestestatusmelding` og `rapport_udtraek`;
+  - (b) CHECK constraints: `length(hestestatusmelding.beskrivelse) <= 500`, `fremmoederegistrering`: `erstatter_id IS NULL OR (korrektions_begrundelse IS NOT NULL AND length(korrektions_begrundelse) >= 5)`, `venteliste`: `oensket_hold_id IS NOT NULL OR oensket_niveau IS NOT NULL`;
+  - (c) Partielle indeks: `venteliste (rytter_id, oensket_hold_id) WHERE status = 'Aktiv'`, `genbesaettelsesforslag (lektion_id) WHERE status = 'Afventer'`, `vikar_engangskode (kode_hash) WHERE status = 'Aktiv'`. Kør derefter `npm run db:migrate` og `npm run db:generate`
+- [X] T107 [P] Opret delte Zod-kontrakter og DTO'er for staldfladen i `packages/contracts/src/stald.ts`: Zod-skemaer for `StaldDag {dato: string, lektioner: StaldHold[]}`, `StaldHold {id: string, holdnavn: string, niveau: Niveau, er_springhold: boolean, starttid: string, varighed_min: number, underviser_navn: string, pladser: StaldPlads[]}`, `StaldPlads {id: string, rytter_navn_kort: string, planlagt_hest_id: string | null, aktuel_hest_id: string | null, afledt_status: FremmoedeStatus | null, godkendte_heste: string[], cheat_sheet_koder: string[], adfaerdsinstruks: string | null}` (verificér: ingen `vaegt_kg`, `hoejde_cm`, `foedselsdato`, `kontakt_*` eller Art. 9 diagnoser jf. R6/R8), `HestStaldInfo {id: string, navn: string, stangmaal_cm: number, temperament: Temperament, sundhedsstatus: Sundhedsstatus, staldnoter: string, hviledag: number, max_lektioner_dag: number, spring_brugt_uge: number}`, `EnhedRegistrerBody {enrollment_token: string}`, `PinLoginBody {pin: string (pattern '^[0-9]{4}$')}`, `VikarLoginBody {vikarkode: string (pattern '^[0-9]{6}$'), fulde_navn: string (minLength 3)}`. Re-eksportér fra `packages/contracts/src/index.ts`
+- [X] T108 [P] Opret delte Zod-kontrakter for offline-sync i `packages/contracts/src/sync.ts`: Zod-skemaer for `KommandoKuvert {kommando_id: string (UUID), type: KommandoType, klient_tidspunkt: string (ISO 8601), bruger_id: string, session_id?: string, payload: unknown}`, enum `KommandoType {RegistrerFremmoede, KorrigerFremmoede, RegistrerAfbud, MeldHestStatus, GodkendOmplacering, RegistrerOensker, VikarLogin}`, specifikke payload-skemaer for hver af de 7 kommandotyper jf. sync-protocol.md §3, `PushAnmodning {kommandoer: KommandoKuvert[]}` (max 500 kommandoer), `KommandoResultat {kommando_id: string, status: 'Anvendt' | 'AlleredeAnvendt' | 'Konflikt' | 'Afvist', fejl_kode?: string, besked?: string}`, `PushSvar {resultater: KommandoResultat[]}`, `PullSvar {cursor: string, aendringer: {lektioner: unknown[], pladser: unknown[], heste: unknown[], brugere: unknown[], vikarkoder: unknown[]}}`. Re-eksportér fra `packages/contracts/src/index.ts`
+- [X] T109 [P] Implementér PIN-sikkerhed, Argon2id hashing og lockout i `apps/api/src/moduler/auth/pin-service.ts`: `hashPin(pin: string): Promise<string>` med Argon2id, `validerPin(pin: string, hash: string): Promise<boolean>`, rate-limiting lockout tracker i hukommelse (eller Redis/DB): 5 fejlslagne forsøg inden for 60 sekunder på samme enhed/IP spærrer for login i 60 sekunder og returnerer 429 `{kode: 'PIN_LOCKOUT', besked: 'For mange forkerte forsøg. Prøv igen om 60 sekunder'}`. Enhedstest i `apps/api/tests/unit/pin-service.spec.ts`
+- [X] T110 [P] Implementér enhedsadministration og middleware i `apps/api/src/moduler/enheder/enhed-service.ts` og `apps/api/src/moduler/enheder/routes.ts`: `POST /auth/enheder` (kræver x-roller `Ledelse`; genererer et tilfældigt 32-tegns engangs enrollment-token, gemmer sha256 hash i `Enhed`); `POST /auth/enheder/registrer` (åben for ny enhed; indløser enrollment-token, genererer en 64-tegns hex `enhedsnoegle`, gemmer sha256 hash, returnerer `enhed_id` og nøgle); samt Fastify preHandler-middleware `kraevEnhed` der validerer header `X-Enhed-Noegle` mod aktiv enhed og afviser med 401 `{kode: 'ENHED_IKKE_BETROET'}`
+- [X] T111 Implementér stald-PIN-login endpoint i `apps/api/src/moduler/auth/pin-routes.ts`: `POST /auth/pin` (kræver `kraevEnhed`; tager `{pin: '^[0-9]{4}$'}`; matcher PIN mod alle aktive brugere med roller `Ridelaerer`, `Ledelse` eller `Staldelev`; opretter signeret httpOnly cookie `session` med `{bruger_id, navn, roller, enhed_id}`; opretter `AuditHaendelse(LOGIN_PIN)` med `enhed_id`; returnerer `Session`). Ukendt PIN giver 401 `{kode: 'UGYLDIG_PIN', besked: 'Forkert PIN-kode'}`
+- [X] T112 [P] Konfigurér Service Worker og PWA offline-caching i `apps/web/vite.config.ts`, `apps/web/src/pwa.ts` og `apps/web/public/manifest.webmanifest`: Opsæt `vite-plugin-pwa` med Workbox. Konfigurér præcise cache-regler: kun ruter under `/stald/*` og statiske JavaScript/CSS/billede-bundles caches offline (`CacheFirst` for statiske aktiver, `NetworkFirst` med hurtig IndexedDB-fallback for stald-navigation). Udeluk `/admin/*` og `/api/*` fra service worker cache. Webmanifest med display `standalone`, baggrundsfarve `#0f172a`, tema `#2563eb`, ikoner og navn "Bøgegården Stald"
+- [X] T113 [P] Implementér Dexie 4 offline IndexedDB i `apps/web/src/offline/dexie-db.ts`: Initialisér Dexie database `BBRidecenterDB` version 1 med tabellerne jf. data-model.md §9: `brugere` (`id`, `navn`, `roller`, `pinHash`, `salt`), `vikarkoder` (`id`, `kodeHash`, `status`), `lektioner` (`id`, `dato`, `holdId`, `starttid`, `niveau`), `pladser` (`id`, `lektionId`, `rytterId`, `aktuelHestId`, `status`), `heste` (`id`, `navn`, `sundhedsstatus`), `outbox` (`++id`, `kommandoId`, `type`, `klientTidspunkt`, `payload`, `sendtStatus`), `meta` (`noegle`, `vaerdi`). Eksportér database-singleton og metoder: `nulstilLokalDB()`, `hentOutbox()`, `tilfoejOutbox(kommando)`, `fjernFraOutbox(kommandoId)`
+- [X] T114 [P] Implementér lokal PIN-validering og offline lockout i `apps/web/src/offline/lokal-pin.ts`: Udregn PBKDF2(PIN, salt) direkte på klienten og sammenlign med cachede hashes i `brugere`-tabel i Dexie. Ved match oprettes en lokal klientsession, og `AuditHaendelse(LOGIN_PIN)` føjes til Dexie `outbox`. Ved 5 på hinanden følgende forkerte indtastninger aktiveres lokal lockout i 60 sekunder med visuel nedtælling. Svartid skal være under 500 ms (US1 AS1)
+- [X] T115 Implementér Server-Sent Events broker i `apps/api/src/plugins/sse.ts`: Fastify-plugin der styrer SSE-forbindelser på `GET /api/v1/events` (tillader forbindelser med session-cookie eller `X-Enhed-Noegle`). Udsender keep-alive kommentarer hvert 15. sekund for at holde forbindelsen åben over proxier. Eksportér metoden `udsendEvent(kanal: 'plads.opdateret' | 'hest.status' | 'synk.advarsel' | 'lektioner.publiceret' | 'oensker.opdateret', payload: object)`
+- [X] T116 Implementér Server Sync Engine i `apps/api/src/moduler/sync/sync-service.ts`, `apps/api/src/moduler/sync/pull-service.ts` og `apps/api/src/moduler/sync/routes.ts`:
+  - `POST /sync/push` (kræver `kraevEnhed`): modtager `PushAnmodning` med op til 500 kommandoer. Kører i transaktion med advisory lock. For hver kommando: tjek om `kommando_id` allerede er eksekveret (hvis ja: returnér `AlleredeAnvendt`). Tjek for clock-skew: hvis `|klient_tidspunkt - servertid| > 5 min.`, markeres afvigelsen i `audit_haendelse`. Delegerer til modulære services (`fremmoedeService`, `omplaceringService`, `statusService`, `vikarService`). Ved samtidig modstridende opdatering inden for 10 min. returneres `Konflikt` og oprettes `DashboardNotifikation(SYNK_KONFLIKT)`;
+  - `GET /sync/pull?cursor=...`: returnerer dataminimeret snapshot for vinduet [i dag .. i dag + 6 dage] (`lektioner`, `pladser`, `heste`, `brugere` med PIN-hashes, `vikarkoder` med aktive hashes);
+  - `GET /stald/dag/:dato`: returnerer dagens `StaldDag` med `godkendte_heste` forudberegnet jf. R6
+- [X] T117 [P] Implementér Klient Outbox & Sync Loop i `apps/web/src/offline/sync-motor.ts`: Sync-loop der automatisk udløses ved: browserens `online`-event, vinduesfokus, 2 sek. debounce efter ny kommando i outbox, periodisk hvert 30. sekund, samt ved manuelt tryk på synkikonet. Sender usynkroniserede kommandoer i batches via `POST /sync/push`, fjerner `Anvendt` og `AlleredeAnvendt`, opdaterer Dexie-stores ved svar, og udløser `GET /sync/pull` for at hente nyeste servertilstand. Udsender synktilstand (`online`, `offline`, `synkroniserer`, `advarsel`)
+- [X] T118 Implementér Stald Layout, Synkindikator og PIN-låseskærm i `apps/web/src/stald/StaldLayout.tsx`, `apps/web/src/faelles/ui/SynkIndikator.tsx` og `apps/web/src/stald/LaasSide.tsx`:
+  - `StaldLayout.tsx`: fast topbar til stald-tabletten med synkindikator, logget ind-navn og manuel "Lås"-knap, samt automatisk inaktivitetstimer (vender tilbage til `/stald/laas` efter 5 minutters inaktivitet);
+  - `SynkIndikator.tsx`: 🟢 Online – alt synkroniseret, 🟡 Offline – N ændringer gemt lokalt, 🔵 Synkroniserer…, 🟠 N advarsler fra sync jf. sync-protocol §9;
+  - `LaasSide.tsx`: ruten `/stald/laas` med store touch-taster (mindst 56 px), 4-cifret PIN-indtastning (< 2 sek. oplåsning), visuel lockout-nedtælling ved 5 fejl, og knappen "Jeg er vikar", der navigerer til `/stald/vikar`
+
+
+**Checkpoint**: Stald-fundamentet og offline-sync kører: Enheder kan autoriseres, PWA fungerer offline, PIN låser op lokalt og på server, og Dexie outbox synkroniserer med Fastify.
+
+---
+
+## 2.2 User Story 1 – Ridelærerens Hurtige Stald-Afkrydsning & Offline-Fremmøde (Priority: P1) (F2-B)
+
+**Mål**: Ridelæreren logger ind med 4-cifret PIN på under 2 sek., åbner dagens hold og afkrydser et hold på 10 ryttere på under 15 sek. (offline og online). Lektionen lukkes automatisk 30 min. efter slut eller via "Afslut hold". Efter lukning kræver ændringer obligatorisk begrundelse (mindst 5 tegn). Append-only revisionsspor med hashkæde.
+
+**Uafhængig test (spec US1)**: V1 i Playwright (`e2e/stald-offline.spec.ts`) og V10 (`e2e/konflikt.spec.ts`).
+
+- [X] T119 [P] [US1] Skriv unit-tests for fremmødevindue og korrektionsregler i `packages/domain/tests/unit/kalender/fremmoede-vindue.spec.ts`: Test at fremmøde er åbent 30 min. før starttidspunkt; test at det forbliver åbent indtil "Afslut hold" eller 30 min. efter sluttidspunkt; test at korrektion efter lukning kræver begrundelse; test at `validerKorrektionBegrundelse(tekst)` afviser tekst under 5 tegn og godkender tekst ≥ 5 tegn
+- [X] T120 [P] [US1] Skriv integrationstest for batch fremmøde og append-only i `apps/api/tests/integration/fremmoede.spec.ts`: Batch-registrering på 10 ryttere via `POST /fremmoede/batch` tildeler status `Fremmoedt` med tidsstempler; åben ændring til `Udeblevet` uden begrundelse accepteres; kald til `POST /lektioner/{id}/afslut` lukker fremmødet; efterfølgende ændring via `POST /fremmoede/{id}/korrektion` fejler uden begrundelse (422) og lykkes med begrundelse (sætter `erstatter_id`); verificér at `UPDATE` og `DELETE` på `fremmoederegistrering` afvises af `afvis_mutation()`; verificér at hashkæden opdateres
+- [X] T121 [P] [US1] Skriv E2E Playwright test for V1 (stald-offline og hurtig afkrydsning) i `e2e/stald-offline.spec.ts`: Log ind med PIN `2222` (< 2 sek.); slå netværk fra (offline-emulering); åbn "Fredag 16:30 Øvet" (10 ryttere); klik "Markér alle fremmødt"; klik én rytter til "Udeblevet"; verificér samlet interaktionstid < 15 sek.; verificér at synkindikatoren viser 🟡 med 2 ændringer i outbox; genopret netværk og verificér 🟢 synk; tryk "Afslut hold"; verificér at rettelse uden begrundelse blokeres, mens rettelse med begrundelse gennemføres og logges
+- [X] T122 [P] [US1] Skriv E2E Playwright test for V10 (offline synkroniseringskonflikt) i `e2e/konflikt.spec.ts`: To uafhængige browserkontekster går offline; begge ændrer status for samme lektionsplads; begge genopretter netværksforbindelse; verificér at seneste `klient_tidspunkt` vinder (felt-LWW); verificér at begge hændelser findes i `audit_haendelse`; verificér at notifikation `SYNK_KONFLIKT` registreres
+- [X] T123 [US1] Implementér domænelogik for fremmødevindue og korrektionsvalidering i `packages/domain/src/kalender/fremmoede-vindue.ts`: Funktionerne `erFremmoedeAabent({starttid: string, varighedMin: number, dato: LocalDate, lukketTidspunkt: Date | null, nu: Date}): boolean`, `beregnAutomatiskLukketid({starttid: string, varighedMin: number, dato: LocalDate}): Date` (30 min. efter lektionens slut i Europe/Copenhagen) og `validerKorrektionBegrundelse(begrundelse: string): boolean` (håndhæver `begrundelse.trim().length >= 5`). Re-eksportér fra `packages/domain/src/index.ts`
+- [X] T124 [US1] Implementér fremmødeservice i `apps/api/src/moduler/fremmoede/fremmoede-service.ts`: `registrerFremmoedeBatch(tx, {lektionId, registreringer, bruger, klientTidspunkt, enhedId, kommandoId})`: gemmer rækker i `fremmoederegistrering` 🧾 ⛓, opdaterer lektionspladsers afledte status, danner hashkæde-entry og audit-entry; `korrigerFremmoede(tx, {fremmoedeId, nyStatus, begrundelse, bruger, klientTidspunkt, enhedId, kommandoId})`: validerer at fremmøde er lukket og begrundelse har mindst 5 tegn, opretter ny række med `erstatter_id`, logger `AuditHaendelse(FREMMOEDE_KORRIGERET)`; `afslutLektion(tx, {lektionId, brugerId})`: sætter `fremmoede_lukket = now()`, opdaterer `Lektion.status = Afviklet`
+- [X] T125 [US1] Implementér fremmøderuter i `apps/api/src/moduler/fremmoede/routes.ts`: `POST /fremmoede/batch` (kræver rolle `Ridelaerer`, `Vikar` eller `Ledelse`), `POST /fremmoede/{id}/korrektion` (kræver rolle `Ridelaerer` eller `Ledelse`), `POST /lektioner/{id}/afslut` (kræver rolle `Ridelaerer` eller `Ledelse`), og `GET /lektioner/{id}/fremmoede`
+- [X] T126 [US1] Implementér Dagens Lektioner visning i `apps/web/src/stald/IDagSide.tsx`: Ruten `/stald/i-dag`: viser dagens lektioner som store overskuelige berøringskort (tidspunkt, holdnavn, niveau, underviser, fremmødestatus, advarselstrekant ⚠ hvis heste er sygemeldte eller afbud er registreret). Ét tryk åbner holdet på `/stald/lektion/:id`. Data hentes fra lokal Dexie DB med fallback til API
+- [X] T127 [US1] Implementér Holdliste og Hurtig-afkrydsning i `apps/web/src/stald/LektionSide.tsx`: Ruten `/stald/lektion/:id`: viser holdets elever (rytterens fornavn + efternavnsinitial), hestens navn og statusindikator. Stor primærknap **"Markér alle fremmødt"** (udfører batch-opdatering lokalt i IndexedDB på under 100 ms). Hurtig-toggle pr. elev mellem `Fremmoedt` og `Udeblevet`. Knap "Afslut hold" med bekræftelse. Hele holdet skal kunne afkrydses på under 15 sek. (SC-001)
+- [X] T128 [US1] Implementér Korrektionsdialog for lukket fremmøde i `apps/web/src/stald/KorrigerPladsDialog.tsx`: Dialog der åbnes ved forsøg på at ændre status på et afsluttet hold. Håndhæver obligatorisk begrundelse: hurtigvalgsknapper ("Fejlafkrydsning", "Kom for sent", "Gik før tid") eller fritekstfelt (validering: mindst 5 tegn). Gemmer i lokal outbox som `KorrigerFremmoede` og opdaterer UI straks
+- [X] T129 [US1] Integrér fremmøderegistrering i stald-sync i `apps/web/src/offline/sync-motor.ts`: Forbind handlingerne fra `LektionSide` og `KorrigerPladsDialog` med outbox-køen, så afkrydsninger automatisk pakkes i `RegistrerFremmoede`- og `KorrigerFremmoede`-kuverter og synkroniseres til serveren
+
+**Checkpoint**: User Story 1 virker ende-til-ende: Ridelæreren kan logge ind med PIN, åbne holdet, trykke "Markér alle fremmødt" offline, registrere undtagelser på under 15 sek., synkronisere automatisk og korrigere med begrundelse efter afslutning.
+
+---
+
+## 2.3 User Story 2 – Resterende system: Stald-ønsker og holdstyring (Priority: P2) (F2-C)
+
+**Mål**: Ridelæreren kan registrere 3 hesteønsker pr. rytter direkte på stald-tabletten i sidste månedstime (`/stald/oensker/:lektionId`), ledelsen kan administrere hold og tilmeldinger i web-admin (`/admin/hold`), og publicerede tildelinger skubbes ud til stald-enhederne i realtid via SSE / pull.
+
+**Uafhængig test (spec US2)**: V2 trin 8 (stald-tablet modtager nye tildelinger efter publicering) og integrationstest for hold og ønsker.
+
+- [X] T130 [P] [US2] Skriv integrationstest for holdadministration og kapacitetsgrænser i `apps/api/tests/integration/hold-og-tilmeldinger.spec.ts`: Opret nyt hold via `POST /hold` (niveau, ugedag 1-7, starttid `^[0-2][0-9]:[0-5][0-9]$`, varighed 30-60 min, kapacitet 1-10); tilmeld ryttere via `POST /hold/{id}/tilmeldinger` indtil `max_kapacitet`; verificér at yderligere tilmelding afvises med 409 `{kode: 'HOLD_FULDT', besked: 'Holdet har nået sin maksimale kapacitet'}`
+- [X] T131 [P] [US2] Skriv integrationstest for stald-ønskeregistrering i `apps/api/tests/integration/oensker-stald.spec.ts`: Ridelærer registrerer 3 hesteønsker for en elev på et af sine hold via `POST /oensker/stald/batch` (el. sync `RegistrerOensker`); verificér at dublerede heste for samme elev afvises; verificér at måned `YYYY-MM` valideres; verificér at ønsker persisteres i `elevoenske` og kan opfyldes af tildelingsmotoren
+- [X] T132 [US2] Implementér udvidet holdadministration i `apps/api/src/moduler/hold/admin-routes.ts`: `POST /hold` (opretter nyt hold; x-roller `Ledelse`), `PATCH /hold/{id}` (redigerer holddata), `POST /hold/{id}/tilmeldinger` (tilmelder rytter med `gyldig_fra` og `ancienitet_dato`, validerer `max_kapacitet`), `DELETE /hold/{id}/tilmeldinger/{tilmeldingId}` (afmelder rytter med `gyldig_til = now()`), `GET /hold/{id}/tilmeldinger`
+- [X] T133 [US2] Implementér stald-ønsker endpoint i `apps/api/src/moduler/oensker/stald-routes.ts`: `POST /oensker/stald/batch` (kræver `Ridelaerer` eller `Ledelse`; gemmer 1., 2. og 3. ønske for en rytter for den kommende måned; logger `AuditHaendelse(OENSKER_REGISTRERET)`), og udsender SSE `oensker.opdateret`
+- [X] T134 [US2] Implementér Admin Holdstyringsside i `apps/web/src/admin/HoldSide.tsx`: Ruten `/admin/hold`: overblik over alle 28–29 ugentlige hold grupperet efter ugedag, visning af tilmeldte ryttere og ledige pladser ("8/10 tilmeldt"), formular til oprettelse/redigering af hold, og dialog til tilmelding/afmelding af elever med øjeblikkelig kapacitetsvalidering
+- [X] T135 [US2] Implementér Stald Elevønsker-visning i `apps/web/src/stald/OenskerLektionSide.tsx`: Ruten `/stald/oensker/:lektionId`: brugervenlig flade til månedens sidste lektion hvor ridelæreren sammen med eleven vælger op til 3 hesteønsker via store billedfliser (filtreret til kun aktive, egnet-niveau heste). Gemmer lokalt i Dexie og lægger `RegistrerOensker` i outbox
+- [X] T136 [US2] Forbind publiceringsnotifikation med staldklient i `apps/web/src/offline/sync-motor.ts`: Når serveren publicerer en ny månedskabale (`POST /tildeling/koersler/{id}/publicer`), udsendes SSE `lektioner.publiceret`. Stald-tablettens sync-motor lytter på hændelsen og udløser automatisk en baggrunds-`Pull`, så tabletten opdateres med de nye hestetildelinger for kommende lektioner (V2 trin 8)
+
+**Checkpoint**: Hele User Story 2 er komplet: Hold oprettes og administreres, ønsker kan indsamles i stalden, månedskabalen køres og publiceres, og de nye hestetildelinger flyder automatisk ud til stald-enhederne.
+
+---
+
+## 2.4 User Story 3 – Akut Hesteomplacering & Sikker Vikar-overlevering (Priority: P3) (F2-D)
+
+**Mål**: Ved akut hestehalthed/sygdom kan alle staldroller melde en hest ude af drift (fail-safe). Ridelæreren får lynhurtigt (< 2 sek.) top-3 godkendte erstatningsheste beregnet offline på tabletten (uden Art. 9 data på enheden). Ved uvarslet lærersygdom kan en vikar logge ind med en 6-cifret engangskode og sit navn, tilgå holdets Cheat Sheet (GDPR Art. 9 anonymiserede koder og instrukser uden diagnoser), og Malene adviseres automatisk på sit dashboard.
+
+**Uafhængig test (spec US3)**: V3 (`e2e/erstatning.spec.ts`), V4 (`e2e/vikar.spec.ts`), V9 (`apps/api/tests/integration/rbac.spec.ts`).
+
+- [ ] T137 [P] [US3] Skriv unit-tests for top-3 erstatning i `packages/domain/tests/unit/erstatning/foreslaa-erstatninger.spec.ts`: Tester `foreslaaErstatninger(plads, heste, dagsbelastninger)`: returnerer op til 3 godkendte erstatningsheste; ekskluderer heste der ikke er i `plads.godkendte_heste`; ekskluderer heste med `sundhedsstatus != Aktiv`; ekskluderer heste der har nået dagsgrænsen (3 for normale, 2 for skåne); ekskluderer heste der har hviledag på lektionens ugedag; sorterer kandidater efter laveste dagsbelastning og temperamentsmatch; beregnes på < 200 ms (krav: < 2 sek.)
+- [ ] T138 [P] [US3] Skriv unit-tests for diagnose-filter i `packages/domain/tests/unit/cheat-sheet/diagnose-filter.spec.ts`: Tester `validerAdfaerdsinstruks(tekst)`: tillader handlingsorienterede instrukser (f.eks. "OBS: Følsom/skånsom håndtering påkrævet - trækkes op i ro", "Hold 3 meters afstand"); afviser medicinske/psykiatriske diagnoser (ADHD, autisme, epilepsi, angst, traume, depression) med `INSTRUKS_INDEHOLDER_DIAGNOSE` jf. GDPR Art. 9 og FR-012
+- [ ] T139 [P] [US3] Skriv integrationstest for hestestatus, omplacering og vikar-login i `apps/api/tests/integration/drift-og-vikar.spec.ts`: (a) Staldelev melder hest `KanIkkeBruges` via `POST /heste/{id}/status` → hestens sundhedsstatus sættes til `Sygemeldt`, række i `hestestatusmelding` 🧾 oprettes; (b) Ridelærer omplacerer via `POST /lektionspladser/{id}/omplacer` → server revaliderer med Welfare Guard, opdaterer `aktuel_hest_id`, opretter `Omplacering` 🧾 ⛓; (c) Vikar logger ind via `POST /auth/vikar/login` med 6-cifret kode og navn → koden sættes til `Anvendt` og kan ikke genbruges, session udløber kl. 23:59, `DashboardNotifikation(VIKAR_LOGIN)` oprettes
+- [ ] T140 [P] [US3] Skriv E2E Playwright test for V3 (syg hest og top-3 erstatning offline) i `e2e/erstatning.spec.ts`: Log ind som staldelev (`3333`) på `/stald/laas`; gå til `/stald/heste` og meld Toobi `KanIkkeBruges` ("halter"); verificér at Toobi er Sygemeldt og berørte hold har advarsel ⚠; gå offline; log ind som Marie; åbn lektion med rytter der havde Toobi; tryk "Find erstatning" under 4x CPU-throttling; verificér top-3 forslag vises på < 2 sek. uden Toobi; godkend erstatning 1; gå online; verificér at SSE opdaterer andet browservindue
+- [ ] T141 [P] [US3] Skriv E2E Playwright test for V4 (vikarlogin og Cheat Sheet uden diagnoser) i `e2e/vikar.spec.ts`: Gå til `/stald/laas` og tryk "Jeg er vikar"; indtast en aktiv 6-cifret kode og navnet "Sofie Vikar"; verificér adgang til dagens hold; åbn holdets Cheat Sheet og verificér standardkoder og instruks uden medicinske diagnoser; verificér i DevTools Network at intet Art. 9, CPR, højde eller vægt findes i API-svaret; log ind på `/admin` som Malene og bekræft notifikationen om Sofie Vikar med knap "Udsted ny kode"
+- [ ] T142 [US3] Implementér top-3 erstatningsalgoritme i `packages/domain/src/erstatning/foreslaa-erstatninger.ts`: Ren funktion der filtrerer tilgængelige heste mod lektionspladsens forudberegnede `godkendteHeste`, ekskluderer syge/inaktive heste, tjekker dagsgrænse mod aktuel dagsbelastning, tjekker hviledag og returnerer de op til 3 bedst egnede erstatninger med begrundelse (`Top3Forslag {hestId: string, navn: string, dagsbelastning: number, begrundelseTekst: string}`). Re-eksportér fra `packages/domain/src/index.ts`
+- [ ] T143 [US3] Implementér diagnosefilter for adfærdsinstruks i `packages/domain/src/sikkerhed/diagnose-filter.ts`: Regex-baseret scan mod liste af medicinske og psykiatriske diagnoseord jf. research.md R8 og spec.md Session 2026-10-05. Eksportér `validerAdfaerdsinstruks(tekst: string): {gyldig: boolean, overtraedelser?: string[]}`. Re-eksportér fra `packages/domain/src/index.ts`
+- [ ] T144 [US3] Implementér hestestatus-service og fail-safe meldinger i `apps/api/src/moduler/heste/status-service.ts` og `apps/api/src/moduler/heste/routes.ts`: `POST /heste/{id}/status`: tager `{type: 'Helbred' | 'Adfaerd', alvorlighed: 'Info' | 'Obs' | 'KanIkkeBruges', beskrivelse: string (≤ 500 tegn)}`. Tilladt for alle roller (`Staldelev`, `Ridelaerer`, `Vikar`, `Ledelse`). Ved `KanIkkeBruges` opdateres `Hest.sundhedsstatus = Sygemeldt`. Gemmer i `hestestatusmelding` 🧾, logger i `audit_haendelse`, og udsender SSE `hest.status`
+- [ ] T145 [US3] Implementér omplaceringsservice i `apps/api/src/moduler/lektioner/omplacering-service.ts` og `apps/api/src/moduler/lektioner/routes.ts`: `GET /lektionspladser/{id}/erstatningsforslag` (beregner og returnerer kandidater); `POST /lektionspladser/{id}/omplacer` (modtager `{til_hest_id, aarsag, forslag_snapshot}`; genkører serverens Welfare Guard; opdaterer `LektionsPlads.aktuel_hest_id`; opretter `Omplacering` 🧾 ⛓; logger i audit; udsender SSE `plads.opdateret`)
+- [ ] T146 [US3] Implementér vikar-engangskoder i `apps/api/src/moduler/auth/vikar-service.ts` og `apps/api/src/moduler/auth/routes.ts`: `POST /auth/vikarkoder` (kun Ledelse; genererer tilfældig 6-cifret talkode, gemmer Argon2id hash i `VikarEngangskode`, returnerer klartekst én gang med udløb om 90 dage); `GET /auth/vikarkoder` (viser aktive/udløbne koder uden hash); `DELETE /auth/vikarkoder/{id}` (spærrer kode); `POST /auth/vikar/login` (kræver `kraevEnhed`; tager `{vikarkode, fulde_navn}`; matcher hash; opdaterer status til `Anvendt`; opretter session til 23:59; opretter `DashboardNotifikation(VIKAR_LOGIN)`)
+- [ ] T147 [US3] Implementér Cheat Sheet service i `apps/api/src/moduler/ryttere/cheat-sheet-service.ts`: `GET /lektioner/{id}/cheat-sheet` (returnerer anonymiserede kort for alle elever på lektionen med `cheat_sheet_koder` og dekrypteret `adfaerdsinstruks`; ingen diagnoser, ingen CPR, ingen vægt/højde); opret endvidere CRUD for `CheatSheetKode` kataloget i `apps/api/src/moduler/ryttere/cheat-sheet-koder-routes.ts`
+- [ ] T148 [US3] Implementér Stald Hesteoversigt og Statusmelding i `apps/web/src/stald/HesteOversigtSide.tsx`: Ruten `/stald/heste`: touch-oversigt over alle heste med aktuel sundhedsstatus (grøn Aktiv, rød Sygemeldt, gul Skadet), staldnoter og knap "Meld hestestatus". Dialog til hurtig statusmelding: vælg Helbred/Adfærd og Alvorlighed (Info, Obs, Kan ikke bruges). Gemmer lokalt i Dexie og sender `MeldHestStatus` til outbox
+- [ ] T149 [US3] Implementér Stald Hesteomplacerings-visning i `apps/web/src/stald/ErstatHestSide.tsx`: Ruten `/stald/plads/:id/erstat`: beregner top-3 godkendte erstatningsheste via domænepakkens `foreslaaErstatninger` direkte i browseren (< 2 sek., offline-resilient). Viser hestens navn, temperament, aktuel dagsbelastning og begrundelse. Tryk på forslag åbner bekræftelse, gemmer lokalt og sender `GodkendOmplacering` til outbox
+- [ ] T150 [US3] Implementér Stald Cheat Sheet visning i `apps/web/src/stald/CheatSheetSide.tsx`: Ruten `/stald/lektion/:id/cheat-sheet`: visuelt overblik over holdets ryttere med store tydelige badges for standardiserede koder (`OBS-SKAANSOM`, `AFSTAND-3M`, `TRAEK-OP-I-RO` osv.) og handlingsorienteret anonymiseret adfærdsinstruks. Intet personfølsomt indhold
+- [ ] T151 [US3] Implementér Vikar-login flade og Admin Vikarkoder i `apps/web/src/stald/VikarSide.tsx` og `apps/web/src/admin/VikarKoderSide.tsx`: (a) `VikarSide.tsx`: ruten `/stald/vikar` med indtastning af 6-cifret kode og obligatorisk fulde navn (mindst 3 tegn), log ind-knap der låser staldfladen op; (b) `VikarKoderSide.tsx`: ruten `/admin/vikarkoder` for Ledelse med liste over aktive og brugte koder, knap "Udsted ny kode" (viser koden med print/kopiér-mulighed), og knap til at spærre koder
+
+**Checkpoint**: User Story 3 virker: Halt hest kan meldes ude af drift på sekunder, top-3 erstatninger beregnes offline på < 2 sek., vikarer kan logge ind med engangskode og tilgå Cheat Sheet uden diagnoser, og Malene adviseres automatisk.
+
+---
+
+## 2.5 User Story 4 – Fraværshåndtering, Ventelistestyring & Ledelsesoverblik (Priority: P4) (F2-E)
+
+**Mål**: Afbud meldt inden kl. 12:00 klassificeres automatisk som rettidige, frigør hestens dagsbelastning og danner øjeblikkeligt (< 5 sek.) et ventelisteforslag på Malenes dashboard med kontaktinfo til manuel kontakt. Opsigelser beregner automatisk slutdato (løbende måned + 30 dage). Ledelsesdashboardet viser realtidsnøgletal, kapacitetsudnyttelse og hestebelastnings-heatmap via SSE. Revisionssikker kommunal tilsynsrapport kan genereres med 1 klik som CSV (med UTF-8 BOM og semikolon) og HTML, verificerbar mod uforanderlig hashkæde.
+
+**Uafhængig test (spec US4)**: V5 (`e2e/afbud.spec.ts`), V6 (`e2e/admin.spec.ts`), V7 (`e2e/admin.spec.ts`), V8 (`e2e/rapport.spec.ts`).
+
+- [ ] T152 [P] [US4] Skriv unit-tests for afbudsfrist, opsigelse og ventelisterangering i `packages/domain/tests/unit/kalender/afbudsfrist.spec.ts`, `packages/domain/tests/unit/kalender/opsigelse.spec.ts` og `packages/domain/tests/unit/venteliste/ranger-venteliste.spec.ts`: (a) `klassificerAfbud`: afbud meldt kl. 11:59:59 på lektionsdagen giver `Afbud_rettidigt`; kl. 12:00:00 giver `Afbud_for_sent`; modtaget kl. 11:30 men indtastet 12:15 giver `Afbud_rettidigt`; (b) `beregnOpsigelsesSlutdato`: modtaget 2026-10-10 giver slutdato 2026-11-30; (c) `rangerVenteliste`: sorterer kandidater efter FIFO-tilmeldingsdato, filtrerer på match med holdets niveau og hestens fysiologiske grænser (HC-06/07/08)
+- [ ] T153 [P] [US4] Skriv integrationstest for afbud, venteliste og genbesættelse i `apps/api/tests/integration/afbud-og-venteliste.spec.ts`: Meld afbud via `POST /lektioner/{id}/afbud`; verificér at hestens dagsbelastning reduceres; verificér at rettidigt afbud på hold med venteliste opretter `Genbesaettelsesforslag` inden for 5 sek. (SC-006) med forælderens kontaktinfo snapshot; verificér at for sent afbud reducerer hestebelastning men IKKE opretter genbesættelsesforslag; godkend forslag via `POST /admin/venteliste/{id}/godkend` og verificér at elev tilføjes som `LektionsPlads(kilde: Venteliste)`
+- [ ] T154 [P] [US4] Skriv integrationstest for kommunal tilsynsrapport og hashkædeverifikation i `apps/api/tests/integration/kommunerapport.spec.ts`: Generér tilsynsrapport via `POST /rapporter/tilsyn` (periode 2026-01-01 til 2026-06-30, aldersgrænse 25 år); verificér at generering tager < 5 sek. (SC-009); verificér at CSV indeholder UTF-8 BOM og semikolon; verificér kolonner: fornavn, efternavn, fødselsdato, bopælskommune, holdnavn, lektionsdato, fremmødestatus (ingen CPR); verificér at SHA-256 hash og hashkæde gemmes i `RapportUdtraek` 🧾; kald `POST /audit/verificer` og verificér succes; manipuler én række direkte i SQL og verificér at `POST /audit/verificer` finder fejlen
+- [ ] T155 [P] [US4] Skriv E2E Playwright test for V5 (afbud før/efter kl. 12 og ventelisteforslag) i `e2e/afbud.spec.ts`: Kør med styret testur kl. 11:30 (`demo:tid`); meld afbud for rytter på hold med venteliste; åbn `/admin/venteliste` og bekræft at genbesættelsesforslag vises inden for 5 sek. med telefonnummer; kør testur kl. 12:15; meld afbud for en anden rytter; bekræft status "Sent afbud" og intet genbesættelsesforslag
+- [ ] T156 [P] [US4] Skriv E2E Playwright test for V6 og V7 (opsigelse og ledelsesdashboard) i `e2e/admin.spec.ts`: Registrér opsigelse på rytter under `/admin/ryttere/:id`; bekræft automatisk beregnet slutdato og `FastPlads` venteliste-forslag; åbn `/admin` dashboard; verificér live nøgletal for holdudnyttelse %, hestebelastnings-heatmap (ingen celle over max), heste ude af drift og advarsel om gentaget fravær for rytter med 3 udeblivelser i træk
+- [ ] T157 [P] [US4] Skriv E2E Playwright test for V8 (1-klik kommunal tilsynsrapport) i `e2e/rapport.spec.ts`: Åbn `/admin/rapporter`; vælg periode 2026-01-01 til 2026-06-30; klik "Generer kommunal tilsynsrapport"; bekræft at rapporten genereres på under 5 sek. med SHA-256 og kædehash; download CSV og verificér format; gå til `/admin/audit` og klik "Verificér hashkæde"; bekræft at hashkæden verificeres som gyldig
+- [ ] T158 [US4] Implementér domænelogik for afbudsfrist i `packages/domain/src/kalender/afbudsfrist.ts`: `klassificerAfbud({lektionDato: LocalDate, lektionStarttid: string, modtagetTidspunkt: Date}): FremmoedeStatus`: fortolker tider i Europe/Copenhagen; returnerer `Afbud_rettidigt` hvis `modtagetTidspunkt` er på lektionsdagen før kl. 12:00:00 (eller før lektionsdagen); returnerer `Afbud_for_sent` hvis kl. 12:00:00 eller senere. Re-eksportér fra `packages/domain/src/index.ts`
+- [ ] T159 [US4] Implementér domænelogik for opsigelse og ventelisterangering i `packages/domain/src/kalender/opsigelse.ts` og `packages/domain/src/venteliste/ranger-venteliste.ts`: `beregnOpsigelsesSlutdato(modtagetDato: LocalDate): LocalDate` (løbende måned + 30 dage); `rangerVenteliste(kandidater, hold, frigjortHest, heste)` (filtrerer egnede kandidater og sorterer efter tilmeldingsdato). Re-eksportér fra `packages/domain/src/index.ts`
+- [ ] T160 [US4] Implementér afbuds-service i `apps/api/src/moduler/lektioner/afbud-service.ts` og `apps/api/src/moduler/lektioner/routes.ts`: `POST /lektioner/{id}/afbud`: tager `{lektionsplads_id, modtaget_tidspunkt?}`; klassificerer via `klassificerAfbud`; opretter `Fremmoederegistrering` 🧾 ⛓; reducerer hestens dagsbelastning; ved rettidigt afbud kaldes `ventelisteService.opretGenbesaettelsesForslag()` asynkront (< 5 sek., SC-006)
+- [ ] T161 [US4] Implementér venteliste- og genbesættelsesservice i `apps/api/src/moduler/venteliste/venteliste-service.ts` og `apps/api/src/moduler/venteliste/routes.ts`: `GET /admin/venteliste` (aktive ventelisteposter og afventende forslag), `POST /admin/venteliste` (opretter ny venteliste-indgang for rytter), `POST /admin/venteliste/forslag/{id}/godkend` (tildeler pladsen til ventelisteeleven, opretter `LektionsPlads(kilde: Venteliste)`), `POST /admin/venteliste/forslag/{id}/afvis` (markerer forslag afvist og foreslår næste kandidat)
+- [ ] T162 [US4] Implementér dashboard-beregninger i `apps/api/src/moduler/dashboard/dashboard-service.ts` og `apps/api/src/moduler/dashboard/routes.ts`: `GET /dashboard/noegletal`: beregner ugentlig holdudnyttelse i %, hesteflådens belastningsfordeling (heatmap hest × ugedag med max-linje), antal heste ude af drift, aktive vikarkoder, afventende ventelisteforslag, og advarsler om gentaget fravær (3+ udeblivelser i træk jf. FR-016). Integreret med SSE så dashboardet opdateres i realtid uden genindlæsning
+- [ ] T163 [US4] Implementér kommunal tilsynsrapportservice i `apps/api/src/moduler/rapporter/rapport-service.ts` og `apps/api/src/moduler/rapporter/routes.ts`: `POST /rapporter/tilsyn`: tager `{periode_fra, periode_til, aldersgraense = 25}`; udtrækker alle tilskudsberettigede fremmøderækker (alder < aldersgrænse ved periodens start jf. FR-018); genererer CSV med semikolon og UTF-8 BOM samt print-HTML; beregner SHA-256 kontrolsum af filen og henter seneste `hash` fra `AuditHaendelse`; opretter `RapportUdtraek` 🧾; udførelse skal ske på < 5 sekunder (SC-009). `GET /rapporter/tilsyn/{id}/download` og `GET /rapporter/historik`
+- [ ] T164 [US4] Implementér hashkæde-verifikationsendpoint i `apps/api/src/moduler/audit/verificer-routes.ts`: `POST /audit/verificer`: gennemgår hele `audit_haendelse`-tabellen fra `server_seq = 1` og genesis-hash (64 × '0'), genberegner SHA-256 for hver række og verificerer at kæden er ubrudt. Returnerer `{gyldig: boolean, antal_haendelser: number, seneste_hash: string, brud_ved_seq?: number}`
+- [ ] T165 [US4] Implementér Web-Admin Dashboard med live nøgletal og heatmap i `apps/web/src/admin/DashboardSide.tsx`: Ruten `/admin`: overblikskort med holdudnyttelse (%), heste ude af drift, afventende forslag og aktive vikarkoder. Interaktivt heatmap over hestebelastning (hest mod ugedag med tydelig max-belastningsgrænse for hver hest). Advarselsboks ved gentaget elevfravær. Real-time lytter på SSE for automatisk opdatering
+- [ ] T166 [US4] Implementér Web-Admin Ventelisteside i `apps/web/src/admin/VentelisteSide.tsx`: Ruten `/admin/venteliste`: visning af aktive ventelister pr. hold/niveau og prioriterede genbesættelsesforslag. Viser forælderens kontaktinformation (navn, telefonnummer) til Malenes manuelle opkald, samt knapperne "Godkend genbesættelse" og "Afvis (ring til næste)"
+- [ ] T167 [US4] Implementér Web-Admin Rapportside i `apps/web/src/admin/RapporterSide.tsx`: Ruten `/admin/rapporter`: datovælger for rapporteringsperiode, aldersgrænsevælger (default 25 år jf. Strandby Kommune), knap **"Generer kommunal tilsynsrapport"** (< 5 sek.), visning af SHA-256 filhash og kædehash, download af CSV og print-visning af HTML samt historiktabel over tidligere genererede rapporter
+- [ ] T168 [US4] Implementér Web-Admin Auditside med hashkæde-tjek i `apps/web/src/admin/AuditSide.tsx`: Ruten `/admin/audit`: søgbart og filtrerbart revisionsspor over alle hændelser i systemet (bruger, handling, entitet, tidspunkter, begrundelser; krypterede felter maskeret som "ændret"). Knap "Verificér hashkæde", der kalder verifikationsendpointet og viser en tydelig grøn status med kædeintegritet
+
+**Checkpoint**: User Story 4 er fuldt implementeret: Afbud registreres med kl. 12:00-reglen, ventelisteforslag oprettes lynhurtigt, ledelsesdashboardet viser live nøgletal og heatmap, og kommunerapporten kan trækkes og verificeres på få sekunder.
+
+---
+
+## 2.6 Polish, Cross-Cutting & Pitch-klar (S5) (F2-F)
+
+**Formål**: Seed fuld flåde og brugere, automatiser V1–V10 testsuiten, gennemfør sikkerheds- og RBAC-audit, og gør POC'en 100 % pitch-klar.
+
+- [ ] T169 [P] Implementér demo- og testværktøjer for tid og manipulation i `tools/demo/tid.ts` og `tools/demo/manipuler.ts`: (a) `demo:tid`: CLI-værktøj der sætter et virtuelt server-ur til test af kl. 12:00 afbudsfrister i V5; (b) `demo:manipuler`: script der forsøger en direkte database-mutation på en historisk fremmøderække for at bevise at append-only triggeren afviser `UPDATE`, samt demonstrerer hashkæde-brud hvis triggeren omgås under demo
+- [ ] T170 [P] Opdatér seed-data med PIN-koder, vikarkoder og lektioner i `tools/seed/data/brugere-og-hold.ts`, `tools/seed/data/cheat-sheet-koder.ts` og `tools/seed/index.ts`: Udfyld Argon2id `pin_hash` for alle demobrugere (Malene `1111`, Marie `2222`, Camilla `2223`, Birgit `2224`, Ella J. `3333`); opret standardkatalog for `CheatSheetKode` (OBS-SKAANSOM, AFSTAND-3M, TRAEK-OP-I-RO, HJAELP-OPSTIGNING, FORAELDRE-STOETTE); opret betroet demo-enhed ("Stald-tablet 1"); opret 3 aktive 6-cifrede vikarkoder ved seed og udskriv dem til terminalen; opret månedens lektioner og lektionspladser så staldfladen straks kan testes
+- [ ] T171 [P] Skriv og kør RBAC- og GDPR-sikkerhedsscan (V9) i `apps/api/tests/integration/rbac.spec.ts`: Rekursiv validering af alle API-svar for stald- og vikarroller: verificér at 403 returneres på `/ryttere/*/sikkerhedsprofil`, `/ryttere`, `/dashboard/*` og `/rapporter/*`; verificér at ingen stald-respons indeholder `vaegt_kg`, `hoejde_cm`, `foedselsdato`, `kontakt_*`, `faldtraume_note`, `angstkategori`, `forbudte_heste` eller `paakraevede_heste`; verificér at enhver læsning af en sikkerhedsprofil danner `AuditHaendelse(SIKKERHEDSPROFIL_LAEST)`
+- [ ] T172 Kør hele testsuiten og samlet bevisførelse: Kør `npm test`, `npm run test:property`, `npm run bench:kabale`, og `npm run test:e2e` for alle scenarier (V1 til V10); verificér at alle tests er grønne og opfylder succeskriterierne SC-001 til SC-009
+- [ ] T173 [P] Opret Fase 2 valideringsrapport i `specs/001-holdadministration-mvp/checklists/fase2-validering.md`: Dokumentér målte tider og resultater for V1 (stald-fremmøde offline < 15 sek.), V2 (kabalen < 30 sek.), V3 (top-3 erstatning offline < 2 sek.), V4 (vikarlogin uden mundtlig overlevering), V5 (afbud og venteliste < 5 sek.), V6 (opsigelse), V7 (dashboard heatmap), V8 (kommunerapport < 5 sek. og hashkædeverifikation), V9 (GDPR/RBAC audit), og V10 (offline-konflikthåndtering)
+- [ ] T174 [P] Opdatér `specs/001-holdadministration-mvp/quickstart.md`: Fjern forbehold om at staldfladen ikke findes; dokumentér alle fungerende kommandoer (`npm run dev`, `db:seed`, `test`, `bench:kabale`, `test:e2e`); tilføj vejledning til stald-tablet brug og PIN-koder; opdatér afsnit 6 (Definition of Done) med status for samtlige punkter
+- [ ] T175 [P] Opdatér `README.md`: Tilføj afsnit om den fulde POC: stald-applikation (PWA), PIN-login, offline-fremmøde, akut hesteerstatning, vikar-adgang, ledelsesdashboard og kommunal tilsynsrapport; opdatér instruktioner for kørsel på tablet over lokalt netværk / HTTPS
+- [ ] T176 Gennemfør pitch-drejebogen på 10 minutter (quickstart.md §5, scene 1–7): Gennemfør hele flowet på en tablet eller tablet-emulering: (0–1 min) Problemet og papirlisterne; (1–3 min) Kabalen på sekunder; (3–5 min) Stalden i flytilstand med PIN og afkrydsning; (5–7 min) Toobi halter og top-3 erstatning; (7–8 min) Vikar og Cheat Sheet uden diagnoser; (8–9 min) Afbud kl. 11:30 og ventelisteforslag; (9–10 min) Kommunen ringer – 1-klik tilsynsrapport og hashkæde-tjek
+- [ ] T177 Forfatnings- og slutkontrol mod `constitution.md`: Verificér Princip I (0 steder findes kode der omgår eller overstyrer HC-regler), Princip II (spærringer håndhæves som data), Princip III (append-only trigger aktiv på alle revisions-tabeller), Princip IV (Art. 9 adskilt, krypteret, logget og aldrig lækket til stald), Princip V (PostgreSQL er SSoT, offline sync er idempotent og konfliktfri)
+
+**Checkpoint (Hele POC'en færdig)**: Systemet opfylder samtlige fire user stories, alle valideringsscenarier (V1–V10) er automatiserede og grønne, forfatningen er 100 % overholdt, og løsningen er pitch-klar.
 
 ---
 
 ## Afhængigheder og rækkefølge
 
-### Sektionsafhængigheder i Fase 1
+### Sektionsafhængigheder i Fase 1 (Gennemført)
 
-- **1.1 Setup**: ingen afhængigheder
-- **1.2 Fundament**: efter 1.1. Blokerer alt US2-arbejde
-- **1.3 Tests**: efter 1.2. Skrives før 1.4–1.6 og skal fejle
-- **1.4 Domæne**: efter 1.3
-- **1.5 API**: T078, T079, T080, T081 og T083 kan køre parallelt med 1.4. T082 kræver T068. T084–T088 kræver T077
-- **1.6 Web**: T089–T094 kan starte, når de tilsvarende endpoints (T078–T082) findes. T095–T097 kræver T085–T087
-- **1.7 Validering**: efter 1.6
-- **Fase 2**: efter Fase 1-checkpointet og teamets validering
+- **1.1 Setup**: ingen afhængigheder [Færdig]
+- **1.2 Fundament**: efter 1.1 [Færdig]
+- **1.3 Tests**: efter 1.2 [Færdig]
+- **1.4 Domæne**: efter 1.3 [Færdig]
+- **1.5 API**: efter 1.4 [Færdig]
+- **1.6 Web**: efter 1.5 [Færdig]
+- **1.7 Validering**: efter 1.6 [Færdig]
 
-### Vigtige enkeltafhængigheder
+### Sektionsafhængigheder i Fase 2
 
-- T018 kræver T011–T017. T019 før T021–T023 (Zod spejler den opdaterede openapi.yaml). T020 før T024
-- T028 kræver T021 og T025. T029 kræver T028. T030 kræver T018
-- T040 kræver T024 og T035–T039. T041 kræver T040. T042 kræver T027, T040 og T041. T043 kræver T025 og T042
-- T047–T056 kræver T046. T055 og T061 kræver T040 og T041
-- T070 kræver T064–T069. T075 kræver T070–T074. T076 kræver T075
-- T080 kræver T027, T030 og T079. T085 kræver T083 og T084. T086 og T087 kræver T085
-- T097 kræver T095 og T096. T100, T101 og T104 skriver i samme fil og køres i rækkefølge
+- **2.1 Stald-fundament (F2-A)**: kræver Fase 1. Blokerer alle stald-brugerhistorier (T105–T118 skal fuldføres først)
+- **2.2 User Story 1 Fremmøde (F2-B)**: kræver 2.1 (T105–T118)
+- **2.3 User Story 2 Resterende system (F2-C)**: kræver 2.1. Kan implementeres parallelt med US1
+- **2.4 User Story 3 Akut drift (F2-D)**: kræver 2.1 og US1's lektionsvisning (`LektionSide.tsx`)
+- **2.5 User Story 4 Ledelse (F2-E)**: kræver 2.1 og US1's fremmødedata til dashboard-nøgletal og rapporter
+- **2.6 Polish & pitch-klar (F2-F)**: kræver US1–US4 færdige
 
-### Kritisk sti
+### Vigtige enkeltafhængigheder i Fase 2
 
-T001 → T008 → T011–T018 → T020 → T024 → T046 → T055 → T064–T069 → T070 → T071 → T075 → T076 → T077 → T084 → T085 → T086 → T087 → T088 → T097 → T099 → T100
+- T106 kræver T105 (Prisma-skema før migration og SQL-triggere)
+- T107 og T108 kræver T105 (Zod spejler nye modeller)
+- T110 og T111 kræver T109 (PIN-service) og T106 (Enhed/Bruger modeller)
+- T113 og T114 kræver T107 (Zod-typer)
+- T116 kræver T106, T107, T108 og T115
+- T117 kræver T113 og T116
+- T118 kræver T114 og T117
+- T123 kræver T108. T124 kræver T123 og T106. T125 kræver T124
+- T127 og T128 kræver T113, T118 og T125. T129 kræver T127 og T117
+- T132 og T133 kræver T106. T134 og T135 kræver T132 og T133
+- T142 og T143 kræver T107. T144, T145, T146 og T147 kræver T106, T142 og T143. T148, T149, T150 og T151 kræver T144–T147
+- T158 og T159 kræver T107. T160–T164 kræver T106, T158 og T159. T165–T168 kræver T160–T164
+- T170 kræver T106. T171 og T172 kræver T111, T125, T145, T147, T163
+- T176 og T177 kræver T172
+
+### Kritisk sti (Fase 2)
+
+T105 → T106 → T107/T108 → T113 → T116 → T117 → T118 → T123 → T124 → T125 → T127 → T142 → T145 → T149 → T158 → T160 → T161 → T163 → T165 → T172 → T176 → T177
 
 ---
 
 ## Parallel-eksempler
 
 ```bash
-# 1.1: efter T001 kan alle workspaces oprettes samtidig
-Task: "T006 Opret workspace packages/domain"
-Task: "T007 Opret workspace packages/contracts"
-Task: "T008 Opret workspace apps/api"
-Task: "T009 Opret workspace apps/web"
-Task: "T010 Opret playwright.config.ts og e2e/global-setup.ts"
+# 2.1: Parallelt fundamentalt arbejde efter T106 (migration)
+Task: "T107 [P] packages/contracts/src/stald.ts"
+Task: "T108 [P] packages/contracts/src/sync.ts"
+Task: "T109 [P] apps/api/src/moduler/auth/pin-service.ts"
+Task: "T110 [P] apps/api/src/moduler/enheder/enhed-service.ts"
+Task: "T112 [P] apps/web/vite.config.ts (PWA)"
+Task: "T113 [P] apps/web/src/offline/dexie-db.ts"
+Task: "T114 [P] apps/web/src/offline/lokal-pin.ts"
 
-# 1.2: seed-datamodulerne er uafhængige filer
-Task: "T036 tools/seed/data/heste.ts"
-Task: "T037 tools/seed/data/brugere-og-hold.ts"
-Task: "T038 tools/seed/data/fredag-ryttere.ts"
-Task: "T039 tools/seed/data/fredag-historik.ts"
+# 2.2: Tests for User Story 1 kan skrives parallelt, før implementeringen starter
+Task: "T119 [P] [US1] packages/domain/tests/unit/kalender/fremmoede-vindue.spec.ts"
+Task: "T120 [P] [US1] apps/api/tests/integration/fremmoede.spec.ts"
+Task: "T121 [P] [US1] e2e/stald-offline.spec.ts"
+Task: "T122 [P] [US1] e2e/konflikt.spec.ts"
 
-# 1.3: alle tests kan skrives samtidig, når T046 er færdig
-Task: "T047 packages/domain/tests/unit/regler/velfaerd.spec.ts"
-Task: "T055 packages/domain/tests/scenarier/forfatning.spec.ts"
-Task: "T056 packages/domain/tests/property/welfare-invariant.spec.ts"
-Task: "T059 apps/api/tests/integration/tildeling.spec.ts"
-Task: "T063 e2e/kabale.spec.ts"
+# 2.4: Tests for User Story 3 kan skrives parallelt
+Task: "T137 [P] [US3] packages/domain/tests/unit/erstatning/foreslaa-erstatninger.spec.ts"
+Task: "T138 [P] [US3] packages/domain/tests/unit/cheat-sheet/diagnose-filter.spec.ts"
+Task: "T139 [P] [US3] apps/api/tests/integration/drift-og-vikar.spec.ts"
+Task: "T140 [P] [US3] e2e/erstatning.spec.ts"
+Task: "T141 [P] [US3] e2e/vikar.spec.ts"
 
-# 1.4: de seks regelfiler er uafhængige
-Task: "T064 regler/hc01-dagsgraense.ts + hc02-skaane.ts"
-Task: "T066 regler/hc05-spring.ts"
-Task: "T068 regler/hc07-sikkerhed.ts"
-Task: "T069 regler/hc08-niveau.ts"
+# 2.5: Tests for User Story 4 kan skrives parallelt
+Task: "T152 [P] [US4] packages/domain/tests/unit/kalender/afbudsfrist.spec.ts"
+Task: "T153 [P] [US4] apps/api/tests/integration/afbud-og-venteliste.spec.ts"
+Task: "T154 [P] [US4] apps/api/tests/integration/kommunerapport.spec.ts"
+Task: "T155 [P] [US4] e2e/afbud.spec.ts"
+Task: "T156 [P] [US4] e2e/admin.spec.ts"
+Task: "T157 [P] [US4] e2e/rapport.spec.ts"
 
-# 1.5 parallelt med 1.4: stamdata-modulerne bruger ikke motoren
-Task: "T078 apps/api/src/moduler/heste/"
-Task: "T079 apps/api/src/moduler/ryttere/"
-Task: "T081 apps/api/src/moduler/hold/routes.ts"
-Task: "T083 apps/api/src/moduler/notifikationer/"
-
-# 1.6: siderne er uafhængige filer
-Task: "T091 HesteSide.tsx"
-Task: "T093 SikkerhedsprofilSide.tsx"
-Task: "T095 HestVaelger.tsx"
-Task: "T098 NotifikationerSide.tsx"
+# 2.6: Parallelt polish og dokumentationsarbejde
+Task: "T169 [P] tools/demo/tid.ts og manipuler.ts"
+Task: "T170 [P] tools/seed/data/brugere-og-hold.ts (PIN-koder)"
+Task: "T171 [P] apps/api/tests/integration/rbac.spec.ts"
+Task: "T173 [P] specs/001-holdadministration-mvp/checklists/fase2-validering.md"
+Task: "T174 [P] specs/001-holdadministration-mvp/quickstart.md"
+Task: "T175 [P] README.md"
 ```
 
 ---
 
 ## Implementeringsstrategi
 
-### PoC først (Fase 1)
+### Inkrementel levering for Fase 2
 
-1. 1.1 + 1.2: fundamentet er klar (checkpoint)
-2. 1.3: beviset defineres som røde tests, før koden findes
-3. 1.4: motoren er grøn i isolation. H2 (F-01 – F-16, invarianter, benchmark) kan bevises her, også uden UI
-4. 1.5 + 1.6: den klikbare vertikale skive
-5. 1.7: **STOP og VALIDÉR**, og øv pitch-scenen "Kabalen på sekunder"
+1. **F2-A Stald-fundament (T105–T118)**: Etablér databaseudvidelser, PIN-sikkerhed, Dexie storage, Service Worker PWA og sync-loop. **Validering**: Enhed kan registreres, låses op med PIN, og IndexedDB outbox synkroniserer.
+2. **F2-B User Story 1 (T119–T129)**: Kernefunktion i stalden. Afkrydsning af hold på under 15 sek. med offline-resiliens og revisionssikker logning. **Validering**: V1 og V10 E2E tests er grønne.
+3. **F2-C User Story 2 Rester (T130–T136)**: Færdiggør stald-ønsker og admin-holdstyring. Forbind publicering med SSE push til stald. **Validering**: V2 trin 8 er grøn.
+4. **F2-D User Story 3 (T137–T151)**: Akutberedskab for hestesygdom og vikarovertagelse. Offline top-3 erstatning og GDPR-sikkert Cheat Sheet. **Validering**: V3 og V4 E2E tests er grønne.
+5. **F2-E User Story 4 (T152–T168)**: Ledelsesværktøjer: 12:00 afbudsregel, venteliste, realtidsdashboard og kommunal tilsynsrapport. **Validering**: V5, V6, V7 og V8 E2E tests er grønne.
+6. **F2-F Polish & Pitch-klar (T169–T177)**: Komplet testsuite (V1–V10), RBAC/GDPR-audit, opdateret dokumentation og pitch-gennemførsel.
 
-### Forslag til fordeling i teamet
+### Parallel Teamstrategi i Fase 2
 
-- Person A: domænepakken (1.4), som er den kritiske sti
-- Person B: API (T078–T083 parallelt med 1.4, derefter T084–T088)
-- Person C: web (T089–T094 tidligt, derefter T095–T099)
-- Person D: seed og tests (T035–T045, 1.3, T061, T063)
-
-### Derefter (Fase 2)
-
-Kør `/speckit-tasks` igen for Fase 2 i rækkefølgen F2-A → F2-B → (F2-C og F2-D parallelt) → F2-E → F2-F. Det svarer til planens S1 → S3 → S4 → S5.
+Når sektion 2.1 (Stald-fundament) er afsluttet, kan arbejdet opdeles optimalt i teamet:
+- **Person A**: User Story 1 (Fremmøde, offline afkrydsning, korrektioner)
+- **Person B**: User Story 3 (Akut hesteomplacering, vikar-engangskoder, Cheat Sheet)
+- **Person C**: User Story 4 (Afbud, venteliste, dashboard nøgletal, kommunerapport)
+- **Person D**: User Story 2 rester (Stald-ønsker, holdstyring) samt demo-scripts og testværktøjer
 
 ---
 
 ## Noter
 
-- [P] = forskellige filer uden afhængighed af ufærdige opgaver. [US2] = sporbarhed til User Story 2
-- Commit efter hver opgave eller logisk gruppe
-- Ret ikke en test for at få den grøn, hvis testen udtrykker forfatningen eller domain-engine.md. F-01 – F-16 er forfatningskrav
-- Beslutninger, som denne opgaveliste træffer, dokumenteres i kontrakterne i T019 og T020: Trækhold, Letøvet og Parthold uden HC-08-niveaukrav; MRV-grupper; reparation med dybde 1; `IKKE_TILDELT_KAPACITET` giver turnus +3; en ny publicering sætter den gamle kørsel til `Forkastet`; dedupe af notifikationer; nye endpoints til session, kørselsliste og kandidater
-- HC-06-grænser, rytternes højde og vægt samt hestenes hviledage er demoværdier, som Malene skal validere før pilotdrift (R15)
-- Alle data er fiktive. Ingen CPR-numre (R8)
+- `[P]` = paralleliserbar opgave (uafhængige filer uden afhængighed af ufærdige opgaver)
+- `[Story]` = entydig tilknytning til User Story fra spec.md (`[US1]`, `[US2]`, `[US3]`, `[US4]`)
+- Commit efter hver opgave eller logisk sammenhængende gruppe
+- Forfatningens principper er ufravigelige: ingen override af HC-01 – HC-08, append-only triggers håndhæves af PostgreSQL, og Art. 9 data transmitteres aldrig til stald-enheder
+- Alle data er fiktive. Ingen CPR-numre gemmes i systemet
+

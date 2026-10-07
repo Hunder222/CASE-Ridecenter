@@ -10,6 +10,8 @@ export interface SessionBruger {
   id: string;
   navn: string;
   roller: Rolle[];
+  /** Sat for stald-sessioner (PIN/vikar) på en betroet enhed. */
+  enhed_id?: string;
 }
 
 export function kraevRoller(...roller: Rolle[]) {
@@ -19,7 +21,12 @@ export function kraevRoller(...roller: Rolle[]) {
     if (!session.roller.some((rolle) => roller.includes(rolle))) {
       throw new DomaeneFejl('INGEN_ADGANG', 'Du har ikke adgang til denne funktion', 403);
     }
-    request.bruger = { id: session.bruger_id, navn: session.navn, roller: session.roller };
+    request.bruger = {
+      id: session.bruger_id,
+      navn: session.navn,
+      roller: session.roller,
+      ...(session.enhed_id ? { enhed_id: session.enhed_id } : {}),
+    };
   };
 }
 

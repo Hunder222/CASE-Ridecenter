@@ -58,6 +58,10 @@ export async function gemOensker(
       );
     }
   }
+  const unikke = new Set(oensker);
+  if (unikke.size !== oensker.length) {
+    throw new DomaeneFejl('DUBLERET_HEST', 'De ønskede heste skal være forskellige', 422);
+  }
   if ((await prisma.hest.count({ where: { id: { in: oensker } } })) !== oensker.length) {
     throw new DomaeneFejl('UKENDT_HEST', 'En af de ønskede heste findes ikke', 422);
   }

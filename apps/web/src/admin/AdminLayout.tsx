@@ -46,6 +46,11 @@ export function AdminLayout() {
                 Heste
               </NavLink>
             </li>
+            <li>
+              <NavLink to="/admin/hold" className={linkStil}>
+                Hold
+              </NavLink>
+            </li>
             {erLedelse && (
               <>
                 <li>

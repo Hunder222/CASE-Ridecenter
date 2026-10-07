@@ -4,6 +4,12 @@ export * from './forklaring/aarsagskoder';
 export { FORBUDTE_TERMER, forbudtTermI } from './forklaring/forbudte-termer';
 export { forklar, statusTekst, UGEDAGSNAVNE } from './forklaring/forklar';
 export { datoerIMaaned, foersteDag, forrigeMaaned, sidsteDag, ugedagFor } from './kalender/maaned';
+export { klassificerAfbud } from './kalender/afbud';
+export {
+  beregnAutomatiskLukketid,
+  erFremmoedeAabent,
+  validerKorrektionBegrundelse,
+} from './kalender/fremmoede-vindue';
 export { turnusFraKoder, turnusPoint } from './kalender/turnus';
 export { dagsgraense } from './regler/hc01-dagsgraense';
 export { hc07Sikkerhed } from './regler/hc07-sikkerhed';
