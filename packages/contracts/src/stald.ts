@@ -110,3 +110,43 @@ export const FremmoedePost = z.object({
 });
 export type FremmoedePost = z.infer<typeof FremmoedePost>;
 
+export const HestestatusmeldingInput = z.strictObject({
+  type: z.enum(['Helbred', 'Adfaerd']),
+  alvorlighed: z.enum(['Info', 'Obs', 'KanIkkeBruges']),
+  beskrivelse: z.string().trim().min(1, 'Beskrivelse påkrævet').max(500, 'Beskrivelsen må højst være 500 tegn'),
+});
+export type HestestatusmeldingInput = z.infer<typeof HestestatusmeldingInput>;
+
+export const OmplaceringInput = z.strictObject({
+  til_hest_id: Uuid,
+  aarsag: z.enum(['HestSyg', 'HestSkadet', 'Adfaerd', 'Andet']),
+  forslag_snapshot: z.unknown().optional(),
+});
+export type OmplaceringInput = z.infer<typeof OmplaceringInput>;
+
+export const VikarKodePost = z.object({
+  id: Uuid,
+  status: z.enum(['Aktiv', 'Anvendt', 'Udloebet', 'Spaerret']),
+  udstedt_dato: Tidspunkt,
+  udloebsdato: Tidspunkt,
+  anvendt_dato: Tidspunkt.nullable(),
+  anvendt_af_vikarnavn: z.string().nullable(),
+});
+export type VikarKodePost = z.infer<typeof VikarKodePost>;
+
+export const VikarKodeOpretSvar = z.object({
+  id: Uuid,
+  kode: z.string(),
+  udloebsdato: Tidspunkt,
+});
+export type VikarKodeOpretSvar = z.infer<typeof VikarKodeOpretSvar>;
+
+export const CheatSheetKort = z.object({
+  plads_id: Uuid,
+  rytter_navn_kort: z.string(),
+  hest_navn: z.string().nullable(),
+  cheat_sheet_koder: z.array(z.string()),
+  adfaerdsinstruks: z.string().nullable(),
+});
+export type CheatSheetKort = z.infer<typeof CheatSheetKort>;
+

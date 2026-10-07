@@ -80,8 +80,15 @@ export const StaldLayout: React.FC = () => {
           />
         </div>
 
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-medium text-slate-300 hidden sm:inline">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/stald/heste')}
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs sm:text-sm font-medium text-slate-200 border border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
+          >
+            🐎 Heste
+          </button>
+          <span className="text-sm font-medium text-slate-300 hidden md:inline">
             {brugerNavn}
           </span>
           <button

@@ -59,6 +59,11 @@ export function AdminLayout() {
                   </NavLink>
                 </li>
                 <li>
+                  <NavLink to="/admin/vikarkoder" className={linkStil}>
+                    Vikarkoder
+                  </NavLink>
+                </li>
+                <li>
                   <NavLink to="/admin/notifikationer" className={linkStil}>
                     Notifikationer
                     {ukvitterede > 0 && (

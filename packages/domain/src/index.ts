@@ -15,5 +15,11 @@ export { dagsgraense } from './regler/hc01-dagsgraense';
 export { hc07Sikkerhed } from './regler/hc07-sikkerhed';
 export { byggPartheste } from './regler/hc08-niveau';
 export { validerPlacering, validerPlan } from './regler/welfare-guard';
+export { validerAdfaerdsinstruks } from './sikkerhed/diagnose-filter';
+export {
+  foreslaaErstatninger,
+  type Top3Forslag,
+  type ForeslaaErstatningerInput,
+} from './erstatning/foreslaa-erstatninger';
 export { beregnEgnethed, type Egnethed } from './tildeling/egnethed';
 export { mrvGreedySolver } from './tildeling/mrv-solver';

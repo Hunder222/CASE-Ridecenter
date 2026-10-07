@@ -11,11 +11,16 @@ import { RyttereSide } from './admin/ryttere/RyttereSide';
 import { SikkerhedsprofilSide } from './admin/ryttere/SikkerhedsprofilSide';
 import { naesteMaaned } from './faelles/maaned';
 import { KraevRolle } from './faelles/session';
+import { VikarKoderSide } from './admin/VikarKoderSide';
+import { CheatSheetSide } from './stald/CheatSheetSide';
+import { ErstatHestSide } from './stald/ErstatHestSide';
+import { HesteOversigtSide } from './stald/HesteOversigtSide';
 import { IDagSide } from './stald/IDagSide';
 import { LaasSide } from './stald/LaasSide';
 import { LektionSide } from './stald/LektionSide';
 import { OenskerLektionSide } from './stald/OenskerLektionSide';
 import { StaldLayout } from './stald/StaldLayout';
+import { VikarSide } from './stald/VikarSide';
 
 function IkkeFundet() {
   return (
@@ -69,6 +74,14 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: 'vikarkoder',
+        element: (
+          <KraevRolle roller={['Ledelse']}>
+            <VikarKoderSide />
+          </KraevRolle>
+        ),
+      },
+      {
         path: 'notifikationer',
         element: (
           <KraevRolle roller={['Ledelse']}>
@@ -79,6 +92,7 @@ const router = createBrowserRouter([
     ],
   },
   { path: '/stald/laas', element: <LaasSide /> },
+  { path: '/stald/vikar', element: <VikarSide /> },
   {
     path: '/stald',
     element: <StaldLayout />,
@@ -86,7 +100,10 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/stald/hold" replace /> },
       { path: 'i-dag', element: <IDagSide /> },
       { path: 'hold', element: <IDagSide /> },
+      { path: 'heste', element: <HesteOversigtSide /> },
       { path: 'lektion/:id', element: <LektionSide /> },
+      { path: 'lektion/:id/cheat-sheet', element: <CheatSheetSide /> },
+      { path: 'plads/:id/erstat', element: <ErstatHestSide /> },
       { path: 'oensker/:lektionId', element: <OenskerLektionSide /> },
     ],
   },

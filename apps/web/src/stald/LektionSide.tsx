@@ -200,10 +200,18 @@ export function LektionSide() {
         >
           ← Dagens hold
         </button>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
+            type="button"
+            onClick={() => navigate(`/stald/lektion/${id}/cheat-sheet`)}
+            className="min-h-[48px] px-3.5 rounded-xl bg-indigo-950/70 hover:bg-indigo-900 text-indigo-200 border border-indigo-700/80 font-semibold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer"
+          >
+            🛡️ Cheat Sheet
+          </button>
+          <button
+            type="button"
             onClick={() => navigate(`/stald/oensker/${id}`)}
-            className="min-h-[48px] px-4 rounded-xl bg-sky-900/60 hover:bg-sky-850 text-sky-200 border border-sky-700/80 font-semibold text-sm"
+            className="min-h-[48px] px-3.5 rounded-xl bg-sky-900/60 hover:bg-sky-850 text-sky-200 border border-sky-700/80 font-semibold text-xs sm:text-sm cursor-pointer"
           >
             Ønsker
           </button>
@@ -276,9 +284,16 @@ export function LektionSide() {
                 <div className="text-lg font-semibold text-white truncate">
                   {plads.rytterNavnKort ?? 'Rytter'}
                 </div>
-                <div className="text-sm text-slate-400 flex items-center gap-2 mt-0.5">
+                <div className="text-sm text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
                   <span className="font-medium text-slate-300">Hest:</span>
                   <span>{plads.aktuelHestId ? 'Tildelt hest' : 'Ingen hest'}</span>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/stald/plads/${plads.id}/erstat`)}
+                    className="px-2 py-0.5 rounded text-xs bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 cursor-pointer"
+                  >
+                    🔄 Erstat hest
+                  </button>
                   {plads.cheatSheetKoder && plads.cheatSheetKoder.length > 0 && (
                     <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-400 font-mono">
                       {plads.cheatSheetKoder.join(', ')}

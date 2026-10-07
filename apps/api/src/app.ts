@@ -16,6 +16,8 @@ import { rytterRuter } from './moduler/ryttere/routes';
 import { syncRuter } from './moduler/sync/routes';
 import { tildelingsRuter } from './moduler/tildeling/routes';
 import { fremmoedeRuter } from './moduler/fremmoede/routes';
+import { omplaceringsRuter } from './moduler/lektioner/routes';
+import { cheatSheetRuter } from './moduler/ryttere/cheat-sheet-koder-routes';
 import { registrerFejlhaandtering } from './plugins/fejl';
 import { registrerKrypto } from './plugins/krypto';
 import { ssePlugin } from './plugins/sse';
@@ -61,6 +63,8 @@ export async function buildApp({ config, prisma, ur = () => new Date(), logger =
       await api.register(tildelingsRuter);
       await api.register(syncRuter);
       await api.register(fremmoedeRuter);
+      await api.register(omplaceringsRuter);
+      await api.register(cheatSheetRuter);
     },
     { prefix: '/api/v1' },
   );
