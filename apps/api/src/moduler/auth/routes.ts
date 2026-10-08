@@ -1,4 +1,14 @@
-import { Fejl, Session, Uuid, VikarKodeOpretSvar, VikarKodePost, VikarLoginBody } from '@ridecenter/contracts';
+import {
+  Fejl,
+  Session,
+  Uuid,
+  VikarAktivKandidat,
+  VikarKodeOpdaterInput,
+  VikarKodeOpretInput,
+  VikarKodeOpretSvar,
+  VikarKodePost,
+  VikarLoginBody,
+} from '@ridecenter/contracts';
 import * as argon2 from 'argon2';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -49,10 +59,10 @@ export const authRuter: FastifyPluginAsyncZod = async (app) => {
     '/auth/vikarkoder',
     {
       onRequest: kraevRoller('Ledelse'),
-      schema: { response: { 201: VikarKodeOpretSvar } },
+      schema: { body: VikarKodeOpretInput.optional(), response: { 201: VikarKodeOpretSvar } },
     },
     async (request, reply) => {
-      const res = await vikarService.udstedVikarKode(aktuelBruger(request));
+      const res = await vikarService.udstedVikarKode(aktuelBruger(request), request.body);
       return reply.code(201).send(res);
     },
   );
@@ -69,6 +79,22 @@ export const authRuter: FastifyPluginAsyncZod = async (app) => {
     },
   );
 
+  // PATCH /auth/vikarkoder/:id (kun Ledelse)
+  app.patch(
+    '/auth/vikarkoder/:id',
+    {
+      onRequest: kraevRoller('Ledelse'),
+      schema: {
+        params: z.object({ id: Uuid }),
+        body: VikarKodeOpdaterInput,
+        response: { 200: VikarKodePost },
+      },
+    },
+    async (request) => {
+      return vikarService.opdaterVikarKode(request.params.id, request.body);
+    },
+  );
+
   // DELETE /auth/vikarkoder/:id (kun Ledelse)
   app.delete(
     '/auth/vikarkoder/:id',
@@ -79,6 +105,18 @@ export const authRuter: FastifyPluginAsyncZod = async (app) => {
     async (request) => {
       await vikarService.spaerVikarKode(request.params.id);
       return { ok: true };
+    },
+  );
+
+  // GET /auth/vikar/kandidater (åben for betroet stald-enhed)
+  app.get(
+    '/auth/vikar/kandidater',
+    {
+      preHandler: kraevEnhed,
+      schema: { response: { 200: z.array(VikarAktivKandidat) } },
+    },
+    async () => {
+      return vikarService.hentAktiveVikarKandidater();
     },
   );
 

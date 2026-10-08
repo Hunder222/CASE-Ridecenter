@@ -12,8 +12,11 @@ export const StaldLayout: React.FC = () => {
   const [synkTilstand, setSynkTilstand] = useState<SynkTilstand>('online');
   const [ventendeAntal, setVentendeAntal] = useState<number>(0);
   const [advarsler, setAdvarsler] = useState<string[]>([]);
+  const [roller, setRoller] = useState<string[]>([]);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const erVikar = roller.includes('Vikar');
 
   const erHoldSide =
     location.pathname === '/stald' ||
@@ -29,12 +32,24 @@ export const StaldLayout: React.FC = () => {
       const sessionPost = await db.meta.get('aktiv_session');
       if (sessionPost?.vaerdi?.navn) {
         setBrugerNavn(sessionPost.vaerdi.navn);
+        const sesRoller: string[] = sessionPost.vaerdi.roller ?? [];
+        setRoller(sesRoller);
+
+        // Hvis vikaren forsøger at tilgå ønsker eller heste, send til i-dag
+        if (sesRoller.includes('Vikar')) {
+          if (
+            location.pathname.startsWith('/stald/oensker') ||
+            location.pathname.startsWith('/stald/heste')
+          ) {
+            navigate('/stald/i-dag', { replace: true });
+          }
+        }
       } else {
         navigate('/stald/laas', { replace: true });
       }
     };
     hentSession();
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   // Lyt til sync-motor
   useEffect(() => {
@@ -103,28 +118,32 @@ export const StaldLayout: React.FC = () => {
           >
             📅 Dagens hold
           </button>
-          <button
-            type="button"
-            onClick={() => navigate('/stald/oensker')}
-            className={`px-3 py-1.5 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-1.5 cursor-pointer ${
-              erOenskerSide
-                ? 'bg-sky-600 text-white border-sky-400 shadow-md shadow-sky-950/50'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-            }`}
-          >
-            ⭐ Elevønsker
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/stald/heste')}
-            className={`px-3 py-1.5 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-1.5 cursor-pointer ${
-              erHesteSide
-                ? 'bg-sky-600 text-white border-sky-400 shadow-md shadow-sky-950/50'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-            }`}
-          >
-            🐎 Heste
-          </button>
+          {!erVikar && (
+            <>
+              <button
+                type="button"
+                onClick={() => navigate('/stald/oensker')}
+                className={`px-3 py-1.5 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-1.5 cursor-pointer ${
+                  erOenskerSide
+                    ? 'bg-sky-600 text-white border-sky-400 shadow-md shadow-sky-950/50'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
+              >
+                ⭐ Elevønsker
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/stald/heste')}
+                className={`px-3 py-1.5 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold border transition flex items-center gap-1.5 cursor-pointer ${
+                  erHesteSide
+                    ? 'bg-sky-600 text-white border-sky-400 shadow-md shadow-sky-950/50'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
+              >
+                🐎 Heste
+              </button>
+            </>
+          )}
           <span className="text-sm font-medium text-slate-300 hidden md:inline ml-1">
             {brugerNavn}
           </span>

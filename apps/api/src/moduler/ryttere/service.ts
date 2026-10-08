@@ -71,3 +71,55 @@ export function opdaterRytter(
     return rytterDto(efter);
   });
 }
+
+export function sletRytter(
+  prisma: PrismaClient,
+  id: string,
+  bruger: SessionBruger,
+  nu: Date,
+): Promise<{ ok: boolean; status: 'Slettet' | 'Opsagt' }> {
+  return prisma.$transaction(async (tx) => {
+    const foer = await tx.rytter.findUnique({
+      where: { id },
+      include: { tilmeldinger: true, pladser: true },
+    });
+    if (!foer) throw new DomaeneFejl('IKKE_FUNDET', 'Rytteren findes ikke', 404);
+
+    // Hvis rytteren har lektionspladser eller tilmeldinger, sæt aktiv_status til Opsagt for at bevare historik
+    if (foer.tilmeldinger.length > 0 || foer.pladser.length > 0) {
+      await tx.rytter.update({
+        where: { id },
+        data: {
+          aktiv_status: 'Opsagt',
+          slutdato: datoKolonne(nu.toISOString().slice(0, 10)),
+        },
+      });
+      await logHaendelse(tx, {
+        handling: 'RYTTER_AENDRET',
+        entitet: 'rytter',
+        entitet_id: id,
+        bruger,
+        tidspunkt: nu,
+        foer: { aktiv_status: foer.aktiv_status },
+        efter: { aktiv_status: 'Opsagt' },
+      });
+      return { ok: true, status: 'Opsagt' };
+    } else {
+      // Ingen relationer - kan slettes helt
+      await tx.sikkerhedsprofil.deleteMany({ where: { rytter_id: id } });
+      await tx.elevoenske.deleteMany({ where: { rytter_id: id } });
+      await tx.venteliste.deleteMany({ where: { rytter_id: id } });
+      await tx.rytter.delete({ where: { id } });
+      await logHaendelse(tx, {
+        handling: 'RYTTER_AENDRET',
+        entitet: 'rytter',
+        entitet_id: id,
+        bruger,
+        tidspunkt: nu,
+        foer: rytterDto(foer),
+        efter: null,
+      });
+      return { ok: true, status: 'Slettet' };
+    }
+  });
+}

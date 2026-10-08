@@ -184,6 +184,7 @@ Hvert snit kan demonstreres for sig, så POC'en altid er pitchbar efter det sene
 | **S3 Akut drift** | Hestestatusmeldinger, top-3 offline, omplacering, SSE, vikarkoder, Cheat Sheet | US3 · F2.1 – F2.3 | V3, V4, V9 |
 | **S4 Ledelse** | Afbud + 12:00-regel, venteliste og forslag, opsigelse, dashboard-nøgletal, notifikationer, kommunerapport, verifikation | US4 | V5 – V8 |
 | **S5 Pitch-klar** | Seed `fuld`, EU-demo-deploy over HTTPS, drejebog, målinger samlet til slides | alle | Quickstart §5–6 |
+| **S6 Drift & UX-polish** | Smart månedskalender (`GET /stald/kalender/:maaned`), tablet numpad, elevønske-rydning & admin-styring (`/admin/oensker`), hestesundhed KPI & hurtig-status, vikar-koder med øje-toggle | FR-019 – FR-023 | E2E + Typecheck |
 
 ## Constitution Check — re-evaluering efter Phase 1-design
 

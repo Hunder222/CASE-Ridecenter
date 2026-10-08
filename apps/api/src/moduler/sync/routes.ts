@@ -63,5 +63,19 @@ export const syncRuter: FastifyPluginAsyncZod = async (app) => {
       return pullService.hentStaldDag(request.params.dato);
     },
   );
+
+  // GET /stald/kalender/:maaned: Hent oversigt over dage med lektioner i måneden
+  app.get(
+    '/stald/kalender/:maaned',
+    {
+      preHandler: [kraevEnhed],
+      schema: {
+        params: z.object({ maaned: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Måned skal have formatet YYYY-MM') }),
+      },
+    },
+    async (request) => {
+      return pullService.hentKalenderMaaned(request.params.maaned);
+    },
+  );
 };
 

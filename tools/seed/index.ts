@@ -13,8 +13,8 @@ function argument(navn: string): string | undefined {
   return process.argv.find((a) => a.startsWith(`--${navn}=`))?.slice(navn.length + 3);
 }
 
-const scenarie = argument('scenarie') ?? 'fredag';
-const maaned = argument('maaned') ?? '2026-07';
+const scenarie = argument('scenarie') ?? 'fuld';
+const maaned = argument('maaned') ?? '2026-10';
 const nulstil = process.argv.includes('--nulstil');
 
 if (scenarie !== 'fredag' && scenarie !== 'fuld') {

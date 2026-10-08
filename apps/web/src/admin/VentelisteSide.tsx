@@ -6,6 +6,13 @@ export const VentelisteSide: React.FC = () => {
   const [fejl, setFejl] = useState<string | null>(null);
   const [behandlerId, setBehandlerId] = useState<string | null>(null);
 
+  // Opret til venteliste state
+  const [visOpretModal, setVisOpretModal] = useState(false);
+  const [ryttere, setRyttere] = useState<any[]>([]);
+  const [valgtRytterId, setValgtRytterId] = useState('');
+  const [valgtNiveau, setValgtNiveau] = useState<string>('Begynder');
+  const [opretter, setOpretter] = useState(false);
+
   const hentData = async () => {
     try {
       const res = await fetch('/api/v1/admin/venteliste');
@@ -23,9 +30,52 @@ export const VentelisteSide: React.FC = () => {
     }
   };
 
+  const hentRyttere = async () => {
+    try {
+      const res = await fetch('/api/v1/stamdata/ryttere');
+      if (res.ok) {
+        const d = await res.json();
+        setRyttere(d);
+        if (d.length > 0 && !valgtRytterId) {
+          setValgtRytterId(d[0].id);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     hentData();
+    hentRyttere();
   }, []);
+
+  const haandterOpretVenteliste = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!valgtRytterId) return;
+    setOpretter(true);
+    try {
+      const res = await fetch('/api/v1/admin/venteliste', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rytter_id: valgtRytterId,
+          oensket_niveau: valgtNiveau,
+        }),
+      });
+      if (res.ok) {
+        setVisOpretModal(false);
+        await hentData();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.besked ?? 'Kunne ikke oprette ventelistepost');
+      }
+    } catch (err: any) {
+      alert(err?.message ?? 'Fejl ved oprettelse');
+    } finally {
+      setOpretter(false);
+    }
+  };
 
   const haandterGodkend = async (forslagId: string) => {
     setBehandlerId(forslagId);
@@ -162,9 +212,18 @@ export const VentelisteSide: React.FC = () => {
 
       {/* VENTELISTE TABEL */}
       <div className="rounded-2xl bg-white border border-stone-200 overflow-hidden shadow-sm">
-        <div className="p-5 border-b border-stone-200">
-          <h2 className="text-base font-bold text-stone-900">Aktive ventelister</h2>
-          <p className="text-xs text-stone-500 mt-0.5">Sorteret efter FIFO-anciennitet (ældste tilmelding først).</p>
+        <div className="p-5 border-b border-stone-200 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-stone-900">Aktive ventelister</h2>
+            <p className="text-xs text-stone-500 mt-0.5">Sorteret efter FIFO-anciennitet (ældste tilmelding først).</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setVisOpretModal(true)}
+            className="min-h-[40px] px-4 rounded-xl bg-emerald-700 hover:bg-emerald-650 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+          >
+            ➕ Tilføj til venteliste
+          </button>
         </div>
 
         {indlaeser ? (
@@ -210,6 +269,85 @@ export const VentelisteSide: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* POPUP MODAL TIL OPRETTELSE PÅ VENTELISTE */}
+      {visOpretModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-stone-200 overflow-hidden">
+            <div className="p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50">
+              <div>
+                <h3 className="text-base font-bold text-stone-900">Tilføj elev til venteliste</h3>
+                <p className="text-xs text-stone-500 mt-0.5">Vælg rytter og ønsket holdniveau</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVisOpretModal(false)}
+                className="w-8 h-8 rounded-full bg-stone-200 hover:bg-stone-300 text-stone-700 flex items-center justify-center font-bold text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={haandterOpretVenteliste} className="p-6 space-y-4">
+              <div>
+                <label htmlFor="rytter-valg" className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1.5">
+                  Vælg rytter
+                </label>
+                <select
+                  id="rytter-valg"
+                  value={valgtRytterId}
+                  onChange={(e) => setValgtRytterId(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl border border-stone-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  required
+                >
+                  <option value="" disabled>Vælg en rytter...</option>
+                  {ryttere.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.fornavn} {r.efternavn} ({r.niveau}) {r.status === 'Opsagt' ? '- Opsagt' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="niveau-valg" className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1.5">
+                  Ønsket niveau
+                </label>
+                <select
+                  id="niveau-valg"
+                  value={valgtNiveau}
+                  onChange={(e) => setValgtNiveau(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl border border-stone-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  required
+                >
+                  <option value="Traekhold">Trækhold</option>
+                  <option value="Begynder">Begynder</option>
+                  <option value="Letoevet">Letøvet</option>
+                  <option value="Oevet">Øvet</option>
+                  <option value="Parthold">Parthold</option>
+                </select>
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVisOpretModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold border border-stone-300 cursor-pointer"
+                >
+                  Annuller
+                </button>
+                <button
+                  type="submit"
+                  disabled={opretter || !valgtRytterId}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-650 text-white text-xs font-bold shadow-sm transition cursor-pointer"
+                >
+                  {opretter ? 'Tilføjer...' : 'Gem på venteliste'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

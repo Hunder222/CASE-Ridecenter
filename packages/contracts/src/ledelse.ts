@@ -43,6 +43,7 @@ export type GenbesaettelsesforslagPost = z.infer<typeof GenbesaettelsesforslagPo
 export const HestBelastningCelle = z.object({
   hest_id: Uuid,
   hest_navn: z.string(),
+  sundhedsstatus: z.enum(['Aktiv', 'Sygemeldt', 'Skadet', 'Karantaene']).optional(),
   ugedag: z.number().int().min(1).max(7),
   ugedag_navn: z.string(),
   planlagte_lektioner: z.number().int(),
@@ -66,6 +67,8 @@ export const DashboardNoegletalSvar = z.object({
     })
   ),
   hest_belastningsfordeling: z.array(HestBelastningCelle),
+  valgt_maaned: z.string().optional(),
+  tilgaengelige_maaneder: z.array(z.string()).optional(),
 });
 export type DashboardNoegletalSvar = z.infer<typeof DashboardNoegletalSvar>;
 

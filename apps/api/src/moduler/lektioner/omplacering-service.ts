@@ -90,11 +90,17 @@ export class OmplaceringService {
       }
     }
 
+    // Find heste optaget på netop denne lektion
+    const optagedeHesteIds = dagsPladser
+      .filter((p) => p.lektion_id === plads.lektion_id && p.id !== plads.id && p.aktuel_hest_id)
+      .map((p) => p.aktuel_hest_id!);
+
     return foreslaaErstatninger({
       plads: { godkendteHeste: egnethed.godkendte },
       heste: domainHeste,
       dagsbelastninger,
       lektionUgedag: plads.lektion.hold.ugedag as Ugedag,
+      optagedeHesteIds,
     });
   }
 

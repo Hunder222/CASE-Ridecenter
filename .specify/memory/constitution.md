@@ -1,12 +1,12 @@
 <!--
 ### Sync Impact Report
-- Version change: 1.1.0 → 1.2.0 (Minor version increment)
-- Bump Rationale: Added new section 'Domænereferencer & Scope-Autoritet (Domain Reference & Scope Authority)' establishing _resources/ as the canonical reference base, with _resources/team/ and specifically _resources/team/feature_prioritization.md (alongside capabilities.md) designated as the primary source of truth for business logic, operational phases, and scope boundaries.
+- Version change: 1.2.0 → 1.3.0 (Minor version increment)
+- Bump Rationale: Added 'Spec Drift & Change Management Guardrail' under Governance, establishing explicit rules against silent divergence, classification of out-of-task user prompts (tasks.md, plan.md, spec.md), and mandatory document traceability.
 - Modified Principles: None.
 - Added Sections:
-  - ## Domænereferencer & Scope-Autoritet (Domain Reference & Scope Authority)
+  - ### Spec Drift & Change Management Guardrail
 - Removed Sections: None.
-- Follow-up TODOs: None (All placeholders and scope authorities fully specified).
+- Follow-up TODOs: None.
 -->
 
 # Bøgegårdens Ridecenter - Digital Holdadministration & Hestetildeling Constitution
@@ -146,6 +146,14 @@ Denne Constitution udgør det øverste styringsdokument for projektet og har for
 - Alle specifikationer (`spec.md`), tekniske planer (`plan.md`), opgavelister (`tasks.md`) og implementeringer MUST verificeres mod de 5 kardinalprincipper, de hårde restriktioner (HC-01 til HC-08), de arkitektoniske guardrails samt scope-afgrænsningen i `_resources/team/feature_prioritization.md`.
 - Enhver foreslået funktionalitet, der bryder eller udvander dyrevelfærd, ryttersikkerhed eller revisionssikkerhed, er automatisk ugyldig.
 
+### Spec Drift & Change Management Guardrail
+1. **No Silent Divergence:** The agent must never execute code changes that deviate from `spec.md` or `plan.md` without explicitly notifying the developer.
+2. **Classification of User Prompts:** When the developer requests changes outside or after the initial task list:
+   - **Styling / Bugfixes / Minor Polish:** Proactively inform the developer that this should be tracked, and automatically append the items as a new phase/task in `tasks.md`.
+   - **Architectural / Component Structure Changes:** Flag the request as an architectural deviation and require an update to `plan.md` before or alongside the code implementation.
+   - **New Features / Changed User Flows / Acceptance Criteria:** Flag the request as a requirement change and prompt to update `spec.md` first.
+3. **Traceability:** Always state in the response which SpecKit document (`spec.md`, `plan.md`, or `tasks.md`) needs updating to maintain 1:1 parity with the codebase.
+
 ### Stakeholder RACI Matrix
 
 | Proces / Ansvarsområde | Malene (Ejer) | Ridelærere (Faste) | Vikarer | Staldelever | Forældre/Elever | Strandby Kommune | Dansk Rideforbund |
@@ -163,4 +171,4 @@ Denne Constitution udgør det øverste styringsdokument for projektet og har for
   - **MINOR:** Tilføjelse af nye principper, sektioner eller væsentligt udvidede domæneguardrails.
   - **PATCH:** Præciseringer, sproglige rettelser og ikke-semantiske tilretninger.
 
-**Version**: 1.2.0 | **Ratified**: 2026-09-29 | **Last Amended**: 2026-10-04
+**Version**: 1.3.0 | **Ratified**: 2026-09-29 | **Last Amended**: 2026-10-07

@@ -3,10 +3,33 @@ import { Badge } from '../../faelles/ui/Badge';
 import { Knap } from '../../faelles/ui/Knap';
 import { Tabel, Td, Th } from '../../faelles/ui/Tabel';
 
-function Statusmaerker({ tildeling }: { tildeling: Hestetildeling }) {
+function Statusmaerker({
+  tildeling,
+  koerselOvertraedelser,
+}: {
+  tildeling: Hestetildeling;
+  koerselOvertraedelser: readonly string[];
+}) {
   const koder = new Set(tildeling.begrundelse_koder.map((kode) => kode.split(':')[0]));
+
+  // En tildeling er kun et reelt velfærdsbrud hvis:
+  // 1. Kørslens samlede Welfare Guard-kontrol rent faktisk har registreret overtrædelser med hesten, ELLER
+  // 2. Tildelingen eksplicit har brud i en historisk/manuel plan (hvor Welfare Guard fandt brud).
+  // Bemærk: Bløde forklaringer (hvorfor 1. ønske ikke blev opfyldt for rytteren) må IKKE markere den tildelte hest som fejl!
+  const hestId = tildeling.hest_id;
+  const harVelfaerdsbrud =
+    Boolean(hestId) &&
+    koerselOvertraedelser.length > 0 &&
+    koerselOvertraedelser.some((b) => {
+      const [basis, hId] = b.split(':');
+      if (hId) return hId === hestId;
+      // Hvis koden ikke er kvalificeret med hest-id, tjek om tildelingens egne begrundelseskoder indeholder den
+      return koder.has(basis);
+    });
+
   return (
     <span className="flex flex-wrap gap-1">
+      {harVelfaerdsbrud && <Badge variant="fejl">⚠️ Velfærdsbrud</Badge>}
       {tildeling.hest_id === null && <Badge variant="fejl">Ikke tildelt – kapacitetsmangel</Badge>}
       {tildeling.oenske_opfyldt !== null && <Badge variant="ok">{tildeling.oenske_opfyldt}. ønske</Badge>}
       {tildeling.er_alternativ_tildeling && (
@@ -50,11 +73,11 @@ export function HoldTabel({
         <Tabel key={holdId} titel={holdPrId.get(holdId)?.holdnavn ?? 'Hold'}>
           <thead>
             <tr>
-              <Th>Rytter</Th>
-              <Th>Hest</Th>
-              <Th>Status</Th>
+              <Th className="w-[30%]">Rytter</Th>
+              <Th className="w-[25%]">Hest</Th>
+              <Th className={onJuster ? 'w-[35%]' : 'w-[45%]'}>Status</Th>
               {onJuster && (
-                <Th>
+                <Th className="w-[10%] text-right">
                   <span className="sr-only">Handling</span>
                 </Th>
               )}
@@ -73,13 +96,16 @@ export function HoldTabel({
                   t.id === valgtId ? 'bg-emerald-50' : ''
                 }`}
               >
-                <Td className="font-medium">{t.rytter_navn}</Td>
-                <Td>{t.hest_id ? (hesteNavne.get(t.hest_id) ?? 'Ukendt hest') : '—'}</Td>
-                <Td>
-                  <Statusmaerker tildeling={t} />
+                <Td className="w-[30%] font-medium">{t.rytter_navn}</Td>
+                <Td className="w-[25%]">{t.hest_id ? (hesteNavne.get(t.hest_id) ?? 'Ukendt hest') : '—'}</Td>
+                <Td className={onJuster ? 'w-[35%]' : 'w-[45%]'}>
+                  <Statusmaerker
+                    tildeling={t}
+                    koerselOvertraedelser={koersel.welfare_guard_overtraedelser}
+                  />
                 </Td>
                 {onJuster && (
-                  <Td className="text-right">
+                  <Td className="w-[10%] text-right">
                     <Knap
                       variant="sekundaer"
                       onClick={(event) => {

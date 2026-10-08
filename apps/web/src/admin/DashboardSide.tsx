@@ -1,20 +1,42 @@
 import React, { useEffect, useState } from 'react';
 import type { DashboardNoegletalSvar, HestBelastningCelle } from '@ridecenter/contracts';
+import { maanedNavn } from '../faelles/maaned';
 
 export const DashboardSide: React.FC = () => {
   const [data, setData] = useState<DashboardNoegletalSvar | null>(null);
+  const [valgtMaaned, setValgtMaaned] = useState<string>('2026-10');
   const [indlaeser, setIndlaeser] = useState(true);
   const [fejl, setFejl] = useState<string | null>(null);
 
-  const hentData = async () => {
+  const [hesteData, setHesteData] = useState<any[]>([]);
+  const [kapacitetFilter, setKapacitetFilter] = useState<{
+    gruppe: string;
+    felt: string;
+    label: string;
+  } | null>(null);
+
+  const hentData = async (maaned?: string) => {
     try {
-      const res = await fetch('/api/v1/dashboard/noegletal');
+      const url = maaned ? `/api/v1/dashboard/noegletal?maaned=${maaned}` : '/api/v1/dashboard/noegletal';
+      const [res, hesteRes] = await Promise.all([
+        fetch(url, { credentials: 'include' }),
+        fetch('/api/v1/heste', { credentials: 'include' }).catch(() => null),
+      ]);
+
       if (res.ok) {
-        const d = await res.json();
+        const d: DashboardNoegletalSvar = await res.json();
         setData(d);
+        if (d.valgt_maaned && !maaned) {
+          setValgtMaaned(d.valgt_maaned);
+        }
       } else {
         const err = await res.json().catch(() => ({}));
         setFejl(err.besked ?? 'Kunne ikke hente dashboard nøgletal');
+      }
+
+      if (hesteRes && hesteRes.ok) {
+        const h = await hesteRes.json();
+        setHesteData(h);
       }
     } catch (err: any) {
       setFejl(err?.message ?? 'Fejl ved hentning af nøgletal');
@@ -24,19 +46,19 @@ export const DashboardSide: React.FC = () => {
   };
 
   useEffect(() => {
-    hentData();
+    hentData(valgtMaaned);
 
     // SSE-lytter for live opdateringer (US4, T165)
     try {
       const es = new EventSource('/api/v1/events');
-      es.addEventListener('plads.opdateret', () => hentData());
-      es.addEventListener('hest.status', () => hentData());
-      es.addEventListener('lektioner.publiceret', () => hentData());
+      es.addEventListener('plads.opdateret', () => hentData(valgtMaaned));
+      es.addEventListener('hest.status', () => hentData(valgtMaaned));
+      es.addEventListener('lektioner.publiceret', () => hentData(valgtMaaned));
       return () => es.close();
     } catch {
       // ignore
     }
-  }, []);
+  }, [valgtMaaned]);
 
   if (indlaeser) {
     return (
@@ -47,15 +69,60 @@ export const DashboardSide: React.FC = () => {
   }
 
   // Gruppér heatmap celler efter hest_id
-  const hesteRækker: Record<string, { hestNavn: string; celler: HestBelastningCelle[] }> = {};
+  const hesteRækker: Record<string, { hestNavn: string; sundhedsstatus?: string; celler: HestBelastningCelle[] }> = {};
   if (data?.hest_belastningsfordeling) {
     for (const c of data.hest_belastningsfordeling) {
       if (!hesteRækker[c.hest_id]) {
-        hesteRækker[c.hest_id] = { hestNavn: c.hest_navn, celler: [] };
+        hesteRækker[c.hest_id] = { hestNavn: c.hest_navn, sundhedsstatus: c.sundhedsstatus, celler: [] };
       }
       hesteRækker[c.hest_id]!.celler.push(c);
     }
   }
+
+  const tilgaengeligeMaaneder = data?.tilgaengelige_maaneder ?? ['2026-10', '2026-11'];
+  const aktuelIndex = tilgaengeligeMaaneder.indexOf(valgtMaaned);
+  const harForrige = aktuelIndex > 0;
+  const harNaeste = aktuelIndex !== -1 && aktuelIndex < tilgaengeligeMaaneder.length - 1;
+
+  const gaaTilForrige = () => {
+    if (harForrige) {
+      setValgtMaaned(tilgaengeligeMaaneder[aktuelIndex - 1]!);
+    }
+  };
+
+  const gaaTilNaeste = () => {
+    if (harNaeste) {
+      setValgtMaaned(tilgaengeligeMaaneder[aktuelIndex + 1]!);
+    }
+  };
+
+  // Heste metadata map for filtrering
+  const hesteMetaMap = new Map<string, any>(hesteData.map((h) => [h.id, h]));
+
+  // Tællere til kapacitet & temperament
+  const kapacitetTællere = {
+    begynder: hesteData.filter((h) => h.godkendt_til_begyndere).length,
+    skaane: hesteData.filter((h) => h.skaane).length,
+    spring: hesteData.filter((h) => !h.springforbud && (h.max_spring_uge ?? 0) > 0).length,
+    temperament: {
+      Rolig: hesteData.filter((h) => h.temperament === 'Rolig').length,
+      Normal: hesteData.filter((h) => h.temperament === 'Normal').length,
+      Frisk: hesteData.filter((h) => h.temperament === 'Frisk').length,
+    },
+  };
+
+  // Filtrerede heatmap rækker baseret på kapacitetFilter
+  const filtreredeHesteRækker = Object.entries(hesteRækker).filter(([hestId, r]) => {
+    if (!kapacitetFilter) return true;
+    const meta = hesteMetaMap.get(hestId) ?? hesteData.find((h) => h.navn === r.hestNavn);
+    if (!meta) return true;
+
+    if (kapacitetFilter.felt === 'begynder') return !!meta.godkendt_til_begyndere;
+    if (kapacitetFilter.felt === 'skaane') return !!meta.skaane;
+    if (kapacitetFilter.felt === 'spring') return !meta.springforbud;
+    if (kapacitetFilter.gruppe === 'Temperamentsoversigt') return meta.temperament === kapacitetFilter.felt;
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -124,6 +191,170 @@ export const DashboardSide: React.FC = () => {
         </div>
       </div>
 
+      {/* Ekstra kapacitets- og temperamentsoversigt (interaktive filtre) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Nøgletal for anvendelighed */}
+        <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm flex flex-col justify-between">
+          <div className="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2">
+            Egenskaber & kapacitet
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                setKapacitetFilter((prev) =>
+                  prev?.felt === 'begynder'
+                    ? null
+                    : { gruppe: 'Egenskaber & kapacitet', felt: 'begynder', label: 'Begyndervenlig' },
+                )
+              }
+              className={`rounded-xl p-3 border text-left transition cursor-pointer ${
+                kapacitetFilter?.felt === 'begynder'
+                  ? 'bg-emerald-100 border-emerald-500 ring-2 ring-emerald-500 shadow-sm'
+                  : 'bg-emerald-50/70 border-emerald-100 hover:bg-emerald-100/70'
+              }`}
+            >
+              <div className="text-xs font-semibold text-emerald-800">Begyndervenlig</div>
+              <div className="text-2xl font-extrabold text-emerald-700 mt-0.5">
+                {kapacitetTællere.begynder} <span className="text-xs font-normal text-stone-500">heste</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setKapacitetFilter((prev) =>
+                  prev?.felt === 'skaane'
+                    ? null
+                    : { gruppe: 'Egenskaber & kapacitet', felt: 'skaane', label: 'Er skånehest' },
+                )
+              }
+              className={`rounded-xl p-3 border text-left transition cursor-pointer ${
+                kapacitetFilter?.felt === 'skaane'
+                  ? 'bg-sky-100 border-sky-500 ring-2 ring-sky-500 shadow-sm'
+                  : 'bg-sky-50/70 border-sky-100 hover:bg-sky-100/70'
+              }`}
+            >
+              <div className="text-xs font-semibold text-sky-800">Er skånehest</div>
+              <div className="text-2xl font-extrabold text-sky-700 mt-0.5">
+                {kapacitetTællere.skaane} <span className="text-xs font-normal text-stone-500">heste</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setKapacitetFilter((prev) =>
+                  prev?.felt === 'spring'
+                    ? null
+                    : { gruppe: 'Egenskaber & kapacitet', felt: 'spring', label: 'Må springe' },
+                )
+              }
+              className={`rounded-xl p-3 border text-left transition cursor-pointer ${
+                kapacitetFilter?.felt === 'spring'
+                  ? 'bg-indigo-100 border-indigo-500 ring-2 ring-indigo-500 shadow-sm'
+                  : 'bg-indigo-50/70 border-indigo-100 hover:bg-indigo-100/70'
+              }`}
+            >
+              <div className="text-xs font-semibold text-indigo-800">Må springe</div>
+              <div className="text-2xl font-extrabold text-indigo-700 mt-0.5">
+                {kapacitetTællere.spring} <span className="text-xs font-normal text-stone-500">heste</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Oversigt over temperament */}
+        <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm flex flex-col justify-between">
+          <div className="text-xs font-bold uppercase tracking-wider text-stone-500 mb-2">
+            Temperamentsoversigt
+          </div>
+          <div className="grid grid-cols-3 gap-2.5">
+            <button
+              type="button"
+              onClick={() =>
+                setKapacitetFilter((prev) =>
+                  prev?.felt === 'Rolig'
+                    ? null
+                    : { gruppe: 'Temperamentsoversigt', felt: 'Rolig', label: 'Rolig' },
+                )
+              }
+              className={`rounded-xl p-2.5 border text-center transition cursor-pointer ${
+                kapacitetFilter?.felt === 'Rolig'
+                  ? 'bg-stone-200 border-stone-500 ring-2 ring-stone-500 shadow-sm'
+                  : 'bg-stone-50 border-stone-200/80 hover:bg-stone-100'
+              }`}
+            >
+              <div className="text-xs font-medium text-stone-600">Rolig</div>
+              <div className="text-xl font-bold text-stone-800 mt-0.5">
+                {kapacitetTællere.temperament.Rolig}
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setKapacitetFilter((prev) =>
+                  prev?.felt === 'Normal'
+                    ? null
+                    : { gruppe: 'Temperamentsoversigt', felt: 'Normal', label: 'Normal' },
+                )
+              }
+              className={`rounded-xl p-2.5 border text-center transition cursor-pointer ${
+                kapacitetFilter?.felt === 'Normal'
+                  ? 'bg-stone-200 border-stone-500 ring-2 ring-stone-500 shadow-sm'
+                  : 'bg-stone-50 border-stone-200/80 hover:bg-stone-100'
+              }`}
+            >
+              <div className="text-xs font-medium text-stone-600">Normal</div>
+              <div className="text-xl font-bold text-stone-800 mt-0.5">
+                {kapacitetTællere.temperament.Normal}
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setKapacitetFilter((prev) =>
+                  prev?.felt === 'Frisk'
+                    ? null
+                    : { gruppe: 'Temperamentsoversigt', felt: 'Frisk', label: 'Frisk' },
+                )
+              }
+              className={`rounded-xl p-2.5 border text-center transition cursor-pointer ${
+                kapacitetFilter?.felt === 'Frisk'
+                  ? 'bg-amber-100 border-amber-500 ring-2 ring-amber-500 shadow-sm'
+                  : 'bg-amber-50 border-amber-200 hover:bg-amber-100/70'
+              }`}
+            >
+              <div className="text-xs font-medium text-amber-800">Frisk</div>
+              <div className="text-xl font-bold text-amber-700 mt-0.5">
+                {kapacitetTællere.temperament.Frisk}
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Aktivt filter-banner */}
+      {kapacitetFilter && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-50 border border-amber-300 px-4 py-3 text-sm text-amber-950 shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🔎</span>
+            <span>
+              Viser <strong>{kapacitetFilter.gruppe}: {kapacitetFilter.label}</strong> ({filtreredeHesteRækker.length} heste fundet i holdplanen)
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setKapacitetFilter(null)}
+            className="rounded-lg bg-white border border-amber-400 px-3 py-1 font-bold text-xs text-amber-900 hover:bg-amber-100 transition cursor-pointer shadow-xs"
+          >
+            Reset
+          </button>
+        </div>
+      )}
+
       {/* ADVARSLER OM GENTAGET FRAVÆR (FR-016: 3+ udeblivelser i træk) */}
       {data?.gentaget_fravaer_advarsler && data.gentaget_fravaer_advarsler.length > 0 && (
         <div className="rounded-2xl bg-amber-50 border border-amber-200 p-5 space-y-3">
@@ -152,14 +383,57 @@ export const DashboardSide: React.FC = () => {
 
       {/* INTERAKTIVT HEATMAP FOR HESTEBELASTNING */}
       <div className="rounded-2xl bg-white border border-stone-200 overflow-hidden shadow-sm">
-        <div className="p-5 border-b border-stone-200 flex items-center justify-between">
+        <div className="p-5 border-b border-stone-200 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-base font-bold text-stone-900">
-              Hesteflådens belastningsfordeling (Heatmap)
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-stone-900">
+                Hesteflådens belastningsfordeling (Heatmap)
+              </h2>
+              <span className="rounded bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-700 capitalize">
+                {maanedNavn(valgtMaaned)}
+              </span>
+            </div>
             <p className="text-xs text-stone-500 mt-0.5">
               Planlagte lektioner pr. ugedag sammenholdt med hestens daglige max-grænse og hviledag.
             </p>
+          </div>
+
+          {/* Månedsvælger */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-stone-600">Holdplan for måned:</span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={gaaTilForrige}
+                disabled={!harForrige}
+                className="h-8 px-2 rounded-lg border border-stone-300 bg-stone-50 text-stone-700 hover:bg-stone-200 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold transition"
+                title="Forrige måned"
+              >
+                ←
+              </button>
+
+              <select
+                value={valgtMaaned}
+                onChange={(e) => setValgtMaaned(e.target.value)}
+                className="h-8 px-2.5 rounded-lg border border-stone-300 bg-white text-stone-900 font-semibold text-xs capitalize cursor-pointer focus:ring-1 focus:ring-emerald-500"
+              >
+                {tilgaengeligeMaaneder.map((m) => (
+                  <option key={m} value={m}>
+                    {maanedNavn(m)}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={gaaTilNaeste}
+                disabled={!harNaeste}
+                className="h-8 px-2 rounded-lg border border-stone-300 bg-stone-50 text-stone-700 hover:bg-stone-200 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold transition"
+                title="Næste måned"
+              >
+                →
+              </button>
+            </div>
           </div>
         </div>
 
@@ -168,6 +442,7 @@ export const DashboardSide: React.FC = () => {
             <thead>
               <tr className="border-b border-stone-200 text-stone-500 uppercase">
                 <th className="py-2.5 px-3 font-semibold">Hest</th>
+                <th className="py-2.5 px-3 font-semibold text-center">Status</th>
                 {['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn'].map((dag) => (
                   <th key={dag} className="py-2.5 px-3 text-center font-semibold">
                     {dag}
@@ -176,40 +451,62 @@ export const DashboardSide: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
-              {Object.values(hesteRækker).map((r) => (
-                <tr key={r.hestNavn} className="hover:bg-stone-50">
-                  <td className="py-2.5 px-3 font-medium text-stone-900">{r.hestNavn}</td>
-                  {r.celler.map((c) => {
-                    let celleKlasse = 'bg-stone-50 text-stone-400';
-                    if (c.er_hviledag) {
-                      celleKlasse = c.planlagte_lektioner > 0
-                        ? 'bg-rose-100 text-rose-800 font-bold ring-1 ring-rose-400'
-                        : 'bg-stone-100 text-stone-400 italic';
-                    } else if (c.er_over_max) {
-                      celleKlasse = 'bg-rose-100 text-rose-800 font-bold ring-1 ring-rose-400';
-                    } else if (c.planlagte_lektioner > 0) {
-                      celleKlasse = 'bg-emerald-100 text-emerald-800 font-semibold';
-                    }
-
-                    return (
-                      <td key={c.ugedag} className="py-2.5 px-3 text-center">
-                        <span
-                          className={`inline-flex items-center justify-center min-w-[36px] py-1 px-2 rounded-lg text-xs ${celleKlasse}`}
-                          title={
-                            c.er_hviledag
-                              ? `Hviledag (${c.planlagte_lektioner} lekt.)`
-                              : `${c.planlagte_lektioner} af max ${c.max_lektioner_dag} lektioner`
-                          }
-                        >
-                          {c.er_hviledag && c.planlagte_lektioner === 0
-                            ? 'Hvile'
-                            : `${c.planlagte_lektioner}/${c.max_lektioner_dag}`}
+              {filtreredeHesteRækker.map(([, r]) => {
+                const status = r.sundhedsstatus ?? 'Aktiv';
+                return (
+                  <tr key={r.hestNavn} className="hover:bg-stone-50">
+                    <td className="py-2.5 px-3 font-medium text-stone-900">{r.hestNavn}</td>
+                    <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                      {status === 'Aktiv' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                          <span>🟢</span> Rask
                         </span>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                      ) : status === 'Sygemeldt' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 border border-rose-200">
+                          <span>🔴</span> Syg
+                        </span>
+                      ) : status === 'Skadet' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 border border-amber-200">
+                          <span>🟠</span> Skadet
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-700 border border-purple-200">
+                          <span>🟣</span> Karantæne
+                        </span>
+                      )}
+                    </td>
+                    {r.celler.map((c) => {
+                      let celleKlasse = 'bg-stone-50 text-stone-400';
+                      if (c.er_hviledag) {
+                        celleKlasse = c.planlagte_lektioner > 0
+                          ? 'bg-rose-100 text-rose-800 font-bold border-2 border-sky-500 shadow-sm'
+                          : 'bg-sky-50 text-sky-700 font-medium border border-sky-200';
+                      } else if (c.er_over_max) {
+                        celleKlasse = 'bg-rose-100 text-rose-800 font-bold ring-1 ring-rose-400';
+                      } else if (c.planlagte_lektioner > 0) {
+                        celleKlasse = 'bg-emerald-100 text-emerald-800 font-semibold';
+                      }
+
+                      return (
+                        <td key={c.ugedag} className="py-2.5 px-3 text-center">
+                          <span
+                            className={`inline-flex items-center justify-center min-w-[36px] py-1 px-2 rounded-lg text-xs ${celleKlasse}`}
+                            title={
+                              c.er_hviledag
+                                ? `Hviledag (${c.planlagte_lektioner} lekt.)`
+                                : `${c.planlagte_lektioner} af max ${c.max_lektioner_dag} lektioner`
+                            }
+                          >
+                            {c.er_hviledag && c.planlagte_lektioner === 0
+                              ? 'Hvile'
+                              : `${c.planlagte_lektioner}/${c.max_lektioner_dag}`}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

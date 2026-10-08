@@ -44,7 +44,12 @@ export function tilHoldData(h: HoldRaekke): HoldData {
  * der er aktive i måneden, for aktive ryttere med HC-07-felterne fra sikkerhedsprofilen, månedens ønsker og
  * turnus fra den publicerede kørsel for måneden før. Samlingerne sorteres, så input_hash er stabil.
  */
-export async function bygAllokeringsInput(prisma: PrismaClient, maaned: string): Promise<KoerselGrundlag> {
+export async function bygAllokeringsInput(
+  prisma: PrismaClient,
+  maaned: string,
+  reserverBegynderHeste?: boolean,
+  reserverSpringHeste?: boolean,
+): Promise<KoerselGrundlag> {
   const foerste = datoKolonne(foersteDag(maaned));
   const sidste = datoKolonne(sidsteDag(maaned));
   const [heste, hold, tilmeldinger, forrige, oensker] = await Promise.all([
@@ -96,6 +101,8 @@ export async function bygAllokeringsInput(prisma: PrismaClient, maaned: string):
         }))
         .sort((a, b) => sammenlign(a.rytterId, b.rytterId) || a.prioritet - b.prioritet),
       turnus: Object.fromEntries(Object.entries(turnus).sort(([a], [b]) => sammenlign(a, b))),
+      reserverBegynderHeste,
+      reserverSpringHeste,
     },
     hold: new Map(hold.map((h) => [h.id, h])),
     fornavne: new Map([...ryttere.values()].map((r) => [r.id, r.fornavn])),

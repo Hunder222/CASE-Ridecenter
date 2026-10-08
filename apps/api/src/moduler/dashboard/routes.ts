@@ -1,4 +1,5 @@
-import { DashboardNoegletalSvar } from '@ridecenter/contracts';
+import { z } from 'zod';
+import { DashboardNoegletalSvar, Maaned } from '@ridecenter/contracts';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { kraevRoller } from '../../plugins/rbac';
 import { DashboardService } from './dashboard-service';
@@ -12,13 +13,17 @@ export const dashboardRuter: FastifyPluginAsyncZod = async (app) => {
     {
       onRequest: kraevRoller('Ledelse'),
       schema: {
+        querystring: z.object({
+          maaned: Maaned.optional(),
+        }),
         response: {
           200: DashboardNoegletalSvar,
         },
       },
     },
-    async () => {
-      return service.hentNoegletal();
+    async (request) => {
+      const maaned = (request.query as { maaned?: string })?.maaned;
+      return service.hentNoegletal(maaned);
     },
   );
 };

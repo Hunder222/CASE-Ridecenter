@@ -18,9 +18,11 @@ export async function koerTildeling(
   app: FastifyInstance,
   maaned: string,
   bruger: SessionBruger,
+  reserverBegynderHeste?: boolean,
+  reserverSpringHeste?: boolean,
 ): Promise<string> {
   const start = performance.now();
-  const grundlag = await bygAllokeringsInput(app.prisma, maaned);
+  const grundlag = await bygAllokeringsInput(app.prisma, maaned, reserverBegynderHeste, reserverSpringHeste);
   const { input } = grundlag;
   const inputHash = beregnInputHash(input);
   const resultat = mrvGreedySolver.allokér(input);

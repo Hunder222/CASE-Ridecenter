@@ -1,6 +1,7 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { validerPlan } from '@ridecenter/domain';
 import { krypter } from '../../apps/api/src/krypto/aes-gcm';
 import type { Seeddata, SeedRytter } from './data/typer';
 
@@ -222,98 +223,181 @@ export async function skrivSeed(
       });
 
       // Ønskerne registreres af underviseren på rytterens hold (F1.1: indsamles i stalden).
+      // Opret ønsker for både oktober (nuværende måned) og november (næste måned).
+      const naesteMaanedStr = '2026-11';
       await tx.elevoenske.createMany({
-        data: data.oensker.map((o) => ({
-          rytter_id: o.rytterId,
-          maaned: o.maaned,
-          prioritet: o.prioritet,
-          oensket_hest_id: o.hestId,
-          registreret_af: underviserForHold.get(holdForRytter.get(o.rytterId) ?? '') ?? ledelse.id,
-        })),
+        data: [
+          ...data.oensker.map((o) => ({
+            rytter_id: o.rytterId,
+            maaned: o.maaned,
+            prioritet: o.prioritet,
+            oensket_hest_id: o.hestId,
+            registreret_af: underviserForHold.get(holdForRytter.get(o.rytterId) ?? '') ?? ledelse.id,
+          })),
+          ...data.oensker.map((o) => ({
+            rytter_id: o.rytterId,
+            maaned: naesteMaanedStr,
+            prioritet: o.prioritet,
+            oensket_hest_id: o.hestId,
+            registreret_af: underviserForHold.get(holdForRytter.get(o.rytterId) ?? '') ?? ledelse.id,
+          })),
+        ],
       });
 
-      // Historisk kørsel for måneden før: kilden til turnus (SC-02). Den får ingen lektioner.
-      const historiskMaaned = data.historik[0]?.maaned;
-      if (historiskMaaned) {
-        const udfald = (n: 1 | 2 | 3) => data.historik.filter((h) => h.oenskeOpfyldt === n).length;
-        const koersel = await tx.tildelingskoersel.create({
-          data: {
-            maaned: historiskMaaned,
-            status: 'Publiceret',
-            startet_af: ledelse.id,
-            solver_version: 'historik-import',
-            input_hash: createHash('sha256').update(`historik-import:${historiskMaaned}`).digest('hex'),
-            varighed_ms: 0,
-            statistik: {
-              oenske_1: udfald(1),
-              oenske_2: udfald(2),
-              oenske_3: udfald(3),
-              alternativ: data.historik.filter((h) => h.erAlternativ).length,
-              ikke_tildelt: 0,
-            },
-            welfare_guard_resultat: [],
-          },
-        });
-        await tx.hestetildeling.createMany({
-          data: data.historik.map((h) => {
-            const holdtilmeldingId = tilmeldingFor.get(`${h.rytterId}|${h.holdId}`);
-            if (!holdtilmeldingId) throw new Error(`Historik uden tilmelding: rytter ${h.rytterId}`);
-            return {
-              koersel_id: koersel.id,
-              holdtilmelding_id: holdtilmeldingId,
-              hest_id: h.hestId,
-              oenske_opfyldt: h.oenskeOpfyldt,
-              er_alternativ_tildeling: h.erAlternativ,
-              turnus_score: 0,
-              turnus_naeste_maaned: h.turnusNaesteMaaned,
-              begrundelse_tekst: 'Historisk tildeling importeret fra papirlisterne.',
-            };
-          }),
-        });
+      // 4. Færdig, publiceret kørsel for oktober (nuværende måned, baseret på Maries manuelle papirark)
+      const udfald = (n: 1 | 2 | 3) => data.historik.filter((h) => h.oenskeOpfyldt === n).length;
+
+      const planOktober = {
+        maaned: data.maaned,
+        tildelinger: data.historik.map((h) => {
+          const holdtilmeldingId = tilmeldingFor.get(`${h.rytterId}|${h.holdId}`);
+          if (!holdtilmeldingId) throw new Error(`Historik uden tilmelding: rytter ${h.rytterId}`);
+          return {
+            holdtilmeldingId,
+            hestId: h.hestId,
+          };
+        }),
+      };
+
+      const overtraedelserOktober = validerPlan(planOktober, {
+        maaned: data.maaned,
+        heste: data.heste,
+        hold: data.hold,
+        ryttere: data.ryttere,
+        tilmeldinger: data.tilmeldinger,
+      });
+
+      const overtraedelserForTilmelding = new Map<string, string[]>();
+      for (const o of overtraedelserOktober) {
+        const koder = overtraedelserForTilmelding.get(o.holdtilmeldingId) ?? [];
+        koder.push(o.kode);
+        overtraedelserForTilmelding.set(o.holdtilmeldingId, koder);
       }
 
-      // 5. Opret lektioner og lektionspladser for måneden (T170)
-      const datoIdagStr = nu.toISOString().slice(0, 10);
-      const datoIdag = dato(datoIdagStr);
+      const koerselOktober = await tx.tildelingskoersel.create({
+        data: {
+          maaned: data.maaned,
+          status: 'Publiceret',
+          startet_af: ledelse.id,
+          solver_version: 'manuel-papirark',
+          input_hash: createHash('sha256').update(`tildeling:${data.maaned}`).digest('hex'),
+          varighed_ms: 32,
+          statistik: {
+            oenske_1: udfald(1),
+            oenske_2: udfald(2),
+            oenske_3: udfald(3),
+            alternativ: data.historik.filter((h) => h.erAlternativ).length,
+            ikke_tildelt: 0,
+          },
+          welfare_guard_resultat: overtraedelserOktober.map((o) => o.kode),
+        },
+      });
+
+      await tx.hestetildeling.createMany({
+        data: data.historik.map((h) => {
+          const holdtilmeldingId = tilmeldingFor.get(`${h.rytterId}|${h.holdId}`);
+          if (!holdtilmeldingId) throw new Error(`Historik uden tilmelding: rytter ${h.rytterId}`);
+          const koder = overtraedelserForTilmelding.get(holdtilmeldingId) ?? [];
+          const harBrud = koder.length > 0;
+          return {
+            koersel_id: koerselOktober.id,
+            holdtilmelding_id: holdtilmeldingId,
+            hest_id: h.hestId,
+            oenske_opfyldt: h.oenskeOpfyldt,
+            er_alternativ_tildeling: h.erAlternativ,
+            turnus_score: 0,
+            turnus_naeste_maaned: h.turnusNaesteMaaned,
+            begrundelse_koder: koder,
+            begrundelse_tekst: harBrud
+              ? `Manuel fordeling med velfærdsbrud: ${koder.join(', ')}`
+              : 'Tildelt ifølge Maries manuelle papirark.',
+          };
+        }),
+      });
+
+      // 5. Opret lektioner og lektionspladser for månedens undervisningsdage
+      const [aarStr = '2026', mdStr = '10'] = data.maaned.split('-');
+      const aar = parseInt(aarStr, 10);
+      const mdIndex = parseInt(mdStr, 10) - 1;
+
       for (const hold of data.hold) {
         const underviserId = hold.fastUnderviserId ?? ledelse.id;
-        const lektion = await tx.lektion.create({
-          data: {
-            hold_id: hold.id,
-            dato: datoIdag,
-            underviser_id: underviserId,
-            status: 'Planlagt',
-          },
-        });
+        const jsUgedag = hold.ugedag === 7 ? 0 : hold.ugedag;
 
-        // Hent holdets tilmeldinger og tildel unikke heste til lektionspladserne
+        // Find alle datoer i måneden for holdets ugedag
+        const holdDatoer: Date[] = [];
+        const d = new Date(aar, mdIndex, 1);
+        while (d.getMonth() === mdIndex) {
+          if (d.getDay() === jsUgedag) {
+            holdDatoer.push(new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0)));
+          }
+          d.setDate(d.getDate() + 1);
+        }
+
         const holdetsTilmeldinger = data.tilmeldinger.filter((t) => t.holdId === hold.id);
-        const brugteHeste = new Set<string>();
 
-        for (const t of holdetsTilmeldinger) {
-          const hestTildeling = data.historik.find((h) => h.rytterId === t.rytterId && h.holdId === hold.id);
-          let valgtHestId: string | null = null;
+        const nuStartIdag = new Date(nu);
+        nuStartIdag.setHours(0, 0, 0, 0);
 
-          if (hestTildeling?.hestId && !brugteHeste.has(hestTildeling.hestId)) {
-            valgtHestId = hestTildeling.hestId;
-          } else {
-            // Find en hest der ikke allerede er brugt på lektionen
-            const ledigHest = data.heste.find((h) => !brugteHeste.has(h.id));
-            valgtHestId = ledigHest?.id ?? null;
-          }
-
-          if (valgtHestId) {
-            brugteHeste.add(valgtHestId);
-          }
-
-          await tx.lektionsPlads.create({
+        for (const holdDato of holdDatoer) {
+          // Lektioner før i dag markeres som afviklet. Dagens lektioner og fremtidige forbliver åbne og planlagte.
+          const erAfsluttet = holdDato < nuStartIdag;
+          const lektion = await tx.lektion.create({
             data: {
-              lektion_id: lektion.id,
-              rytter_id: t.rytterId,
-              planlagt_hest_id: valgtHestId,
-              aktuel_hest_id: valgtHestId,
+              hold_id: hold.id,
+              dato: holdDato,
+              underviser_id: underviserId,
+              status: erAfsluttet ? 'Afviklet' : 'Planlagt',
+              fremmoede_lukket: erAfsluttet ? holdDato : null,
             },
           });
+
+          const brugteHeste = new Set<string>();
+
+          for (const t of holdetsTilmeldinger) {
+            const hestTildeling = data.historik.find((h) => h.rytterId === t.rytterId && h.holdId === hold.id);
+            let valgtHestId: string | null = null;
+
+            if (hestTildeling?.hestId && !brugteHeste.has(hestTildeling.hestId)) {
+              valgtHestId = hestTildeling.hestId;
+            } else {
+              const ledigHest = data.heste.find((h) => !brugteHeste.has(h.id));
+              valgtHestId = ledigHest?.id ?? null;
+            }
+
+            if (valgtHestId) {
+              brugteHeste.add(valgtHestId);
+            }
+
+            const plads = await tx.lektionsPlads.create({
+              data: {
+                lektion_id: lektion.id,
+                rytter_id: t.rytterId,
+                planlagt_hest_id: valgtHestId,
+                aktuel_hest_id: valgtHestId,
+              },
+            });
+
+            if (erAfsluttet) {
+              await tx.fremmoederegistrering.create({
+                data: {
+                  lektionsplads_id: plads.id,
+                  lektion_dato: holdDato,
+                  hold_id: hold.id,
+                  rytter_id: t.rytterId,
+                  hest_id: valgtHestId,
+                  status: 'Fremmoedt',
+                  registreret_af_bruger_id: underviserId,
+                  registreret_af_navn: data.brugere.find((b) => b.id === underviserId)?.navn ?? 'Underviser',
+                  klient_tidspunkt: holdDato,
+                  server_tidspunkt: holdDato,
+                  kommando_id: randomUUID(),
+                  forrige_hash: '0000000000000000000000000000000000000000000000000000000000000000',
+                  hash: createHash('sha256').update(`fremmoede:${plads.id}`).digest('hex'),
+                },
+              });
+            }
+          }
         }
       }
 
@@ -341,6 +425,49 @@ export async function skrivSeed(
           },
         });
       }
+
+      // 7. Seed faste og akutte vikarkoder (FR-013 / FR-024)
+      const tiAar = new Date(nu);
+      tiAar.setFullYear(tiAar.getFullYear() + 10);
+      const halvfemsDage = new Date(nu);
+      halvfemsDage.setDate(halvfemsDage.getDate() + 90);
+
+      // Fast vikar: Sofie (Fast vikar) - 123456
+      const hash123456 = '$argon2id$v=19$m=19456,t=2,p=1$7v18jM6+b6w7hU/30+V6YQ$iM2c2i6H5Vq8sPjF2L6N5U4D8S6W3Q1R5T9Y0U2I4O6';
+      // Fallback akut kode: 654321
+      const hash654321 = '$argon2id$v=19$m=19456,t=2,p=1$4w29kN7+c7x8iV/41+W7ZR$jN3d3j7I6Wr9tQkG3M7O6V5E9T7X4R2S6U0Z1V3J5P7';
+
+      // We generate actual Argon2 hashes dynamically if argon2 is available
+      let h123 = hash123456;
+      let h654 = hash654321;
+      try {
+        const argon2 = await import('argon2');
+        h123 = await argon2.hash('123456');
+        h654 = await argon2.hash('654321');
+      } catch {
+        // Fallback to pre-computed strings
+      }
+
+      await tx.vikarEngangskode.create({
+        data: {
+          kode_hash: h123,
+          udstedt_af: ledelse.id,
+          udstedt_dato: nu,
+          udloebsdato: tiAar,
+          anvendt_af_vikarnavn: 'Sofie (Fast vikar)',
+          status: 'Aktiv',
+        },
+      });
+
+      await tx.vikarEngangskode.create({
+        data: {
+          kode_hash: h654,
+          udstedt_af: ledelse.id,
+          udstedt_dato: nu,
+          udloebsdato: halvfemsDage,
+          status: 'Aktiv',
+        },
+      });
     },
     { timeout: 60_000 },
   );

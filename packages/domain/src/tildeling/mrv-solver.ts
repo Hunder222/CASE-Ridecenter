@@ -34,10 +34,22 @@ function efterAncienitet(a: Plads, b: Plads): number {
   );
 }
 
-/** Ikke-hjælpere før hjælpere (SC-05), så MRV-gruppe, turnus (SC-02), ancienitet og tilmeldings-id. */
+/** Ikke-hjælpere før hjælpere (SC-05), evt. begynderhold først ved reserverBegynderHeste / springhold først ved reserverSpringHeste, så MRV-gruppe, turnus (SC-02), ancienitet og tilmeldings-id. */
 function raekkefoelge(a: Plads, b: Plads): number {
+  const erBegynderA = a.hold.niveau === 'Begynder' || a.hold.niveau === 'Traekhold';
+  const erBegynderB = b.hold.niveau === 'Begynder' || b.hold.niveau === 'Traekhold';
+  const reserverPrioritet =
+    a.reserverBegynderHeste && erBegynderA !== erBegynderB ? (erBegynderA ? -1 : 1) : 0;
+
+  const erSpringA = a.hold.erSpringhold;
+  const erSpringB = b.hold.erSpringhold;
+  const reserverSpringPrioritet =
+    a.reserverSpringHeste && erSpringA !== erSpringB ? (erSpringA ? -1 : 1) : 0;
+
   return (
     Number(a.rytter.erHjaelper) - Number(b.rytter.erHjaelper) ||
+    reserverPrioritet ||
+    reserverSpringPrioritet ||
     mrvGruppe(a.egnethed.godkendte.length) - mrvGruppe(b.egnethed.godkendte.length) ||
     efterAncienitet(a, b)
   );
@@ -82,6 +94,8 @@ export const mrvGreedySolver: AllocationSolver = {
         hestId: null,
         fast: null,
         sc04: false,
+        reserverBegynderHeste: input.reserverBegynderHeste,
+        reserverSpringHeste: input.reserverSpringHeste,
       });
     }
 

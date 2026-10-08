@@ -68,7 +68,7 @@ export function OenskerLektionSide() {
     try {
       // 1. Hent heste
       let h = await db.heste.toArray();
-      if (h.length === 0 || h.some((hest) => hest.godkendt_til_begyndere === undefined)) {
+      if (h.length === 0 || h.some((hest) => hest.godkendt_til_begyndere === undefined || hest.skaane === undefined)) {
         try {
           const hRes = await fetch('/api/v1/heste');
           if (hRes.ok) {
@@ -81,6 +81,9 @@ export function OenskerLektionSide() {
               temperament: x.temperament,
               godkendt_til_begyndere: x.godkendt_til_begyndere ?? x.godkendtTilBegyndere ?? false,
               egnet_oevet: x.egnet_oevet ?? x.egnetOevet ?? true,
+              skaane: x.skaane ?? false,
+              springforbud: x.springforbud ?? false,
+              max_spring_uge: x.max_spring_uge ?? 0,
               staldnoter: x.staldnoter ?? '',
               hviledag: x.hviledag,
               max_lektioner_dag: x.max_lektioner_dag,
@@ -406,7 +409,7 @@ export function OenskerLektionSide() {
           <button
             type="button"
             onClick={() => setFilterStatus('Alle')}
-            className={`min-h-[40px] px-3.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+            className={`min-h-[48px] px-4 rounded-xl text-xs sm:text-sm font-bold border transition cursor-pointer flex items-center justify-center ${
               filterStatus === 'Alle'
                 ? 'bg-slate-700 text-white border-slate-600 shadow'
                 : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:text-slate-200'
@@ -417,7 +420,7 @@ export function OenskerLektionSide() {
           <button
             type="button"
             onClick={() => setFilterStatus('Mangler')}
-            className={`min-h-[40px] px-3.5 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+            className={`min-h-[48px] px-4 rounded-xl text-xs sm:text-sm font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
               filterStatus === 'Mangler'
                 ? 'bg-amber-600 text-white border-amber-500 shadow'
                 : 'bg-amber-950/40 text-amber-300 border-amber-800/80 hover:bg-amber-950/60'
@@ -428,7 +431,7 @@ export function OenskerLektionSide() {
           <button
             type="button"
             onClick={() => setFilterStatus('Klar')}
-            className={`min-h-[40px] px-3.5 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+            className={`min-h-[48px] px-4 rounded-xl text-xs sm:text-sm font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
               filterStatus === 'Klar'
                 ? 'bg-emerald-600 text-white border-emerald-500 shadow'
                 : 'bg-emerald-950/40 text-emerald-300 border-emerald-800/80 hover:bg-emerald-950/60'
@@ -445,7 +448,7 @@ export function OenskerLektionSide() {
           <button
             type="button"
             onClick={() => setFilterNiveau('Alle')}
-            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition cursor-pointer shrink-0 ${
+            className={`min-h-[44px] px-4 rounded-xl text-xs sm:text-sm font-semibold border transition cursor-pointer shrink-0 flex items-center justify-center ${
               filterNiveau === 'Alle'
                 ? 'bg-sky-600 text-white border-sky-400 shadow'
                 : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
@@ -458,7 +461,7 @@ export function OenskerLektionSide() {
               key={niv}
               type="button"
               onClick={() => setFilterNiveau(niv)}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition cursor-pointer shrink-0 ${
+              className={`min-h-[44px] px-4 rounded-xl text-xs sm:text-sm font-semibold border transition cursor-pointer shrink-0 flex items-center justify-center ${
                 filterNiveau === niv
                   ? 'bg-sky-600 text-white border-sky-400 shadow'
                   : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700'
@@ -632,14 +635,6 @@ export function OenskerLektionSide() {
                         </span>
                       );
                     })}
-                    <button
-                      type="button"
-                      onClick={() => setValgteOensker([])}
-                      className="text-xs font-semibold px-2 py-0.5 rounded-lg border border-rose-900/80 bg-rose-950/50 text-rose-300 hover:bg-rose-900/60 cursor-pointer ml-1 transition"
-                      title="Fjern alle valgte heste"
-                    >
-                      Ryd valg
-                    </button>
                   </div>
                 )}
               </div>
@@ -683,32 +678,56 @@ export function OenskerLektionSide() {
                     {egnedeHeste.map(({ hest }) => {
                       const oenskeNr = valgteOensker.indexOf(hest.id);
                       const erValgt = oenskeNr !== -1;
+                      const erBegynder = !!hest.godkendt_til_begyndere;
+                      const erSpring = !hest.springforbud && (hest.max_spring_uge ?? 0) > 0;
+                      const erSkaane = !!hest.skaane;
 
                       return (
                         <button
                           key={hest.id}
                           type="button"
                           onClick={() => toggleHestOenske(hest.id)}
-                          className={`min-h-[92px] p-4 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                          className={`min-h-[110px] p-4 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                             erValgt
                               ? 'border-emerald-500 bg-emerald-950/80 ring-2 ring-emerald-400 shadow-md'
                               : 'border-emerald-900/50 bg-slate-850 hover:border-emerald-600/70 hover:bg-slate-800 text-slate-300'
                           }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-lg font-bold text-white">{hest.navn}</span>
-                            {erValgt ? (
-                              <span className="w-7 h-7 rounded-full bg-emerald-500 text-white font-bold text-xs flex items-center justify-center shadow">
-                                {oenskeNr + 1}.
-                              </span>
-                            ) : (
-                              <span className="w-6 h-6 rounded-full border border-emerald-700/60 text-emerald-400 text-xs flex items-center justify-center">
-                                +
-                              </span>
-                            )}
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-lg font-bold text-white">{hest.navn}</span>
+                              {erValgt ? (
+                                <span className="w-7 h-7 rounded-full bg-emerald-500 text-white font-bold text-xs flex items-center justify-center shadow">
+                                  {oenskeNr + 1}.
+                                </span>
+                              ) : (
+                                <span className="w-6 h-6 rounded-full border border-emerald-700/60 text-emerald-400 text-xs flex items-center justify-center">
+                                  +
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Relevante tags ift. kabalen */}
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {erBegynder && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800/80">
+                                  👶 Begynderhest
+                                </span>
+                              )}
+                              {erSpring && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-950 text-indigo-300 border border-indigo-800/80">
+                                  🏇 Springhest
+                                </span>
+                              )}
+                              {erSkaane && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-950 text-sky-300 border border-sky-800/80">
+                                  🛡️ Skånehest
+                                </span>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="mt-2 space-y-1">
+                          <div className="mt-3 space-y-1">
                             <div className="text-xs text-slate-400 flex items-center justify-between">
                               <span>{hest.temperament ?? 'Rolig'}</span>
                               <span>{hest.stangmaal_cm} cm</span>
@@ -717,6 +736,11 @@ export function OenskerLektionSide() {
                               <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
                                 <span>✓</span> Egnet til {redigerElev.niveau}
                               </span>
+                              {redigerElev.niveau !== 'Begynder' && erBegynder && (
+                                <span className="text-[10px] text-amber-400/90 block mt-0.5">
+                                  💡 Forbeholdt begynderhold ved kabale
+                                </span>
+                              )}
                             </div>
                           </div>
                         </button>
@@ -751,34 +775,58 @@ export function OenskerLektionSide() {
                     {ikkeEgnedeHeste.map(({ hest, aarsag }) => {
                       const oenskeNr = valgteOensker.indexOf(hest.id);
                       const erValgt = oenskeNr !== -1;
+                      const erBegynder = !!hest.godkendt_til_begyndere;
+                      const erSpring = !hest.springforbud && (hest.max_spring_uge ?? 0) > 0;
+                      const erSkaane = !!hest.skaane;
 
                       return (
                         <button
                           key={hest.id}
                           type="button"
                           onClick={() => toggleHestOenske(hest.id)}
-                          className={`min-h-[92px] p-4 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                          className={`min-h-[110px] p-4 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                             erValgt
                               ? 'border-amber-500 bg-amber-950/80 ring-2 ring-amber-400 shadow-md'
                               : 'border-slate-800/80 bg-slate-900/50 hover:border-slate-700 text-slate-400'
                           }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className={`text-lg font-bold ${erValgt ? 'text-white' : 'text-slate-300'}`}>
-                              {hest.navn}
-                            </span>
-                            {erValgt ? (
-                              <span className="w-7 h-7 rounded-full bg-amber-500 text-white font-bold text-xs flex items-center justify-center shadow">
-                                {oenskeNr + 1}.
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className={`text-lg font-bold ${erValgt ? 'text-white' : 'text-slate-300'}`}>
+                                {hest.navn}
                               </span>
-                            ) : (
-                              <span className="w-6 h-6 rounded-full border border-slate-700 text-slate-500 text-xs flex items-center justify-center">
-                                +
-                              </span>
-                            )}
+                              {erValgt ? (
+                                <span className="w-7 h-7 rounded-full bg-amber-500 text-white font-bold text-xs flex items-center justify-center shadow">
+                                  {oenskeNr + 1}.
+                                </span>
+                              ) : (
+                                <span className="w-6 h-6 rounded-full border border-slate-700 text-slate-500 text-xs flex items-center justify-center">
+                                  +
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Relevante tags ift. kabalen */}
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {erBegynder && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800/80">
+                                  👶 Begynderhest
+                                </span>
+                              )}
+                              {erSpring && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-950 text-indigo-300 border border-indigo-800/80">
+                                  🏇 Springhest
+                                </span>
+                              )}
+                              {erSkaane && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-950 text-sky-300 border border-sky-800/80">
+                                  🛡️ Skånehest
+                                </span>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="mt-2 space-y-1">
+                          <div className="mt-3 space-y-1">
                             <div className="text-xs text-slate-500 flex items-center justify-between">
                               <span>{hest.temperament ?? 'Rolig'}</span>
                               <span>{hest.stangmaal_cm} cm</span>

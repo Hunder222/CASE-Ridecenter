@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Dato, Niveau, Sundhedsstatus, Temperament, Tidspunkt, Uuid } from './faelles';
+import { AktivStatus, Dato, Niveau, Sundhedsstatus, Temperament, Tidspunkt, Uuid } from './faelles';
 
 // Stald-DTO'er (data-model.md §9, research R6/R8). De indeholder ALDRIG vaegt_kg, hoejde_cm, foedselsdato,
 // kontakt_*, faldtraume_note, angstkategori, forbudte_heste eller paakraevede_heste (Princip IV).
@@ -14,6 +14,7 @@ export const StaldPlads = z.object({
   planlagt_hest_id: Uuid.nullable(),
   aktuel_hest_id: Uuid.nullable(),
   afledt_status: FremmoedeStatus.nullable(),
+  rytter_status: AktivStatus.optional(),
   /** Afledt liste (R6). Aldrig årsagen til, at en hest mangler. */
   godkendte_heste: z.array(Uuid),
   cheat_sheet_koder: z.array(z.string()),
@@ -131,15 +132,40 @@ export const VikarKodePost = z.object({
   udloebsdato: Tidspunkt,
   anvendt_dato: Tidspunkt.nullable(),
   anvendt_af_vikarnavn: z.string().nullable(),
+  kode: z.string().optional().nullable(),
+  navn: z.string().optional().nullable(),
+  fast_vikar: z.boolean().optional(),
 });
 export type VikarKodePost = z.infer<typeof VikarKodePost>;
+
+export const VikarKodeOpretInput = z.strictObject({
+  navn: z.string().trim().min(2).optional(),
+  fast_vikar: z.boolean().optional(),
+  udloeb_dage: z.number().int().min(1).max(3650).optional().nullable(), // null = aldrig
+});
+export type VikarKodeOpretInput = z.infer<typeof VikarKodeOpretInput>;
+
+export const VikarKodeOpdaterInput = z.strictObject({
+  navn: z.string().trim().min(2).optional().nullable(),
+  fast_vikar: z.boolean().optional(),
+});
+export type VikarKodeOpdaterInput = z.infer<typeof VikarKodeOpdaterInput>;
 
 export const VikarKodeOpretSvar = z.object({
   id: Uuid,
   kode: z.string(),
   udloebsdato: Tidspunkt,
+  navn: z.string().optional().nullable(),
+  fast_vikar: z.boolean().optional(),
 });
 export type VikarKodeOpretSvar = z.infer<typeof VikarKodeOpretSvar>;
+
+export const VikarAktivKandidat = z.object({
+  id: Uuid,
+  navn: z.string(),
+  fast_vikar: z.boolean(),
+});
+export type VikarAktivKandidat = z.infer<typeof VikarAktivKandidat>;
 
 export const CheatSheetKort = z.object({
   plads_id: Uuid,

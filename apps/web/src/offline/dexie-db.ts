@@ -34,6 +34,7 @@ export interface LokalPlads {
   aktuelHestId: string | null;
   planlagtHestId: string | null;
   status: string | null;
+  rytterStatus?: string;
   godkendteHeste?: string[];
   cheatSheetKoder?: string[];
   adfaerdsinstruks?: string | null;
@@ -47,6 +48,9 @@ export interface LokalHest {
   temperament?: string;
   godkendt_til_begyndere?: boolean;
   egnet_oevet?: boolean;
+  skaane?: boolean;
+  springforbud?: boolean;
+  max_spring_uge?: number;
   staldnoter?: string;
   hviledag?: number;
   max_lektioner_dag?: number;

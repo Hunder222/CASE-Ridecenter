@@ -18,14 +18,28 @@ export function scoreHest({
   ugebelastning,
   rytter,
   hest,
+  erBegynderHold = false,
+  reserverBegynderHeste = false,
+  erSpringHold = false,
+  reserverSpringHeste = false,
 }: {
   oenskePrioritet: 1 | 2 | 3 | null;
   ugebelastning: number;
   rytter: RytterRegelData;
   hest: HestData;
+  erBegynderHold?: boolean;
+  reserverBegynderHeste?: boolean;
+  erSpringHold?: boolean;
+  reserverSpringHeste?: boolean;
 }): number {
   const sc01 = oenskePrioritet === null ? 0 : SC01_POINT[oenskePrioritet];
-  return sc01 - 10 * ugebelastning + progressionsbonus(rytter, hest);
+  // Hvis begynder-heste skal reserveres, trækkes der 200 point fra, hvis en ikke-begynder rytter på et ikke-begynder hold tildeles en begynder-godkendt hest
+  const begynderFradrag =
+    reserverBegynderHeste && !erBegynderHold && hest.godkendtTilBegyndere ? 200 : 0;
+  // Hvis spring-heste skal reserveres, trækkes der point fra, hvis en hest der må springe tildeles et ikke-springhold
+  const springFradrag =
+    reserverSpringHeste && !erSpringHold && !hest.springforbud && hest.maxSpringUge > 0 ? 200 : 0;
+  return sc01 - 10 * ugebelastning + progressionsbonus(rytter, hest) - begynderFradrag - springFradrag;
 }
 
 export interface Kandidat {

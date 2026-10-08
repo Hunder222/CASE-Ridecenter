@@ -99,6 +99,10 @@ export interface AllokeringsInput {
   oensker: readonly Oenske[];
   /** Rytter-id → turnusprioritet fra måneden før (0 hvis ukendt). */
   turnus: Readonly<Record<RytterId, number>>;
+  /** Hvis true, reserveres begynder-godkendte heste primært til begynder/trækhold. */
+  reserverBegynderHeste?: boolean;
+  /** Hvis true, reserveres spring-godkendte heste primært til springhold. */
+  reserverSpringHeste?: boolean;
 }
 
 export interface Tildeling {

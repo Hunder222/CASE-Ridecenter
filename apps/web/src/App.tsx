@@ -9,8 +9,6 @@ import { OenskerSide } from './admin/oensker/OenskerSide';
 import { RytterDetaljeSide } from './admin/ryttere/RytterDetaljeSide';
 import { RyttereSide } from './admin/ryttere/RyttereSide';
 import { SikkerhedsprofilSide } from './admin/ryttere/SikkerhedsprofilSide';
-import { naesteMaaned } from './faelles/maaned';
-import { KraevRolle } from './faelles/session';
 import { DashboardSide } from './admin/DashboardSide';
 import { VentelisteSide } from './admin/VentelisteSide';
 import { RapporterSide } from './admin/RapporterSide';
@@ -25,6 +23,16 @@ import { LektionSide } from './stald/LektionSide';
 import { OenskerLektionSide } from './stald/OenskerLektionSide';
 import { StaldLayout } from './stald/StaldLayout';
 import { VikarSide } from './stald/VikarSide';
+import { naesteMaaned } from './faelles/maaned';
+import { harRolle, KraevRolle, useSession } from './faelles/session';
+
+function AdminForsideRedirect() {
+  const { data: session } = useSession();
+  if (harRolle(session, 'Ledelse')) {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+  return <Navigate to={`/admin/kabale/${naesteMaaned()}`} replace />;
+}
 
 function IkkeFundet() {
   return (
@@ -48,7 +56,7 @@ const router = createBrowserRouter([
       </KraevRolle>
     ),
     children: [
-      { index: true, element: <Navigate to={`/admin/kabale/${naesteMaaned()}`} replace /> },
+      { index: true, element: <AdminForsideRedirect /> },
       { path: 'kabale/:maaned', element: <KabaleSide /> },
       { path: 'oensker/:maaned', element: <OenskerSide /> },
       { path: 'heste', element: <HesteSide /> },

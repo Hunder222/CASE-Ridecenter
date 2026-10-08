@@ -18,6 +18,39 @@ export class PullService {
   ) {}
 
   /**
+   * Returnerer alle datoer i måneden med planlagte lektioner og antal lektioner.
+   */
+  async hentKalenderMaaned(maanedStr: string): Promise<Array<{ dato: string; antalLektioner: number }>> {
+    const [aarStr = '2026', mdStr = '1'] = maanedStr.split('-');
+    const aar = parseInt(aarStr, 10);
+    const md = parseInt(mdStr, 10);
+    const startDato = new Date(Date.UTC(aar, md - 1, 1, 0, 0, 0));
+    const slutDato = new Date(Date.UTC(aar, md, 0, 23, 59, 59, 999));
+
+    const lektioner = await this.prisma.lektion.findMany({
+      where: {
+        dato: {
+          gte: startDato,
+          lte: slutDato,
+        },
+      },
+      select: {
+        dato: true,
+      },
+    });
+
+    const taelling = new Map<string, number>();
+    for (const l of lektioner) {
+      const dStr = l.dato.toISOString().slice(0, 10);
+      taelling.set(dStr, (taelling.get(dStr) ?? 0) + 1);
+    }
+
+    return Array.from(taelling.entries())
+      .map(([dato, antalLektioner]) => ({ dato, antalLektioner }))
+      .sort((a, b) => a.dato.localeCompare(b.dato));
+  }
+
+  /**
    * Returnerer dagens lektioner og pladser med forudberegnede godkendte_heste (R6)
    * samt anonymiserede stald-DTO'er.
    */
@@ -106,6 +139,7 @@ export class PullService {
           planlagt_hest_id: plads.planlagt_hest_id,
           aktuel_hest_id: plads.aktuel_hest_id,
           afledt_status: senesteFremmoede ? (senesteFremmoede.status as any) : null,
+          rytter_status: rytter.aktiv_status as any,
           godkendte_heste: godkendteHeste,
           cheat_sheet_koder: profil?.cheat_sheet_koder ?? [],
           adfaerdsinstruks,

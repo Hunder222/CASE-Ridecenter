@@ -28,7 +28,11 @@ export type OenskerPut = z.infer<typeof OenskerPut>;
 
 // ---------------------------------------------------------------- Tildeling (Kabalen)
 
-export const KoerselStart = z.strictObject({ maaned: Maaned });
+export const KoerselStart = z.strictObject({
+  maaned: Maaned,
+  reserver_begynder_heste: z.boolean().optional(),
+  reserver_spring_heste: z.boolean().optional(),
+});
 export type KoerselStart = z.infer<typeof KoerselStart>;
 
 export const KoerselStatistik = z.object({
@@ -72,7 +76,10 @@ export const Tildelingskoersel = z.object({
 export type Tildelingskoersel = z.infer<typeof Tildelingskoersel>;
 
 /** Manuel justering. Der findes intet override-felt (Princip I). */
-export const ManuelJustering = z.strictObject({ hest_id: Uuid });
+export const ManuelJustering = z.strictObject({
+  hest_id: Uuid,
+  tillad_niveau_dispensation: z.boolean().optional(),
+});
 export type ManuelJustering = z.infer<typeof ManuelJustering>;
 
 export const KandidatHest = z.object({
@@ -90,6 +97,12 @@ export const PubliceringSvar = z.object({
   erstattet_koersel_id: Uuid.nullable(),
 });
 export type PubliceringSvar = z.infer<typeof PubliceringSvar>;
+
+export const SaertildelSvar = z.object({
+  antal_tildelt: Heltal,
+  koersel: Tildelingskoersel,
+});
+export type SaertildelSvar = z.infer<typeof SaertildelSvar>;
 
 // ---------------------------------------------------------------- Notifikationer
 

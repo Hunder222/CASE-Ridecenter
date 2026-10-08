@@ -392,6 +392,84 @@ description: "Opgaveliste for 001-holdadministration-mvp: Fase 1 PoC (User Story
 
 ---
 
+## 2.7 Fase 3: Polish, Tablet UX & Demo-forbedringer (S6) (F2-G)
+
+**Formål**: Efterbehandling og forbedringer af brugeroplevelsen baseret på pilotafprøvning: tablet-venlige numpads, smart datonavigation, fuld månedskalender, rydning af elevønsker, administrativ hestesundhedsstyring, vikarkoder med øje-toggle og fuld ugeplanssimulering for oktober og november.
+
+- [X] T178 [P] [US3] Implementér tablet-venlig numpad UI for vikar-login i `apps/web/src/stald/VikarSide.tsx`: Header med vikarnavn i toppen, stor touch-optimeret numpad (1–9, C, 0, ⌫), cirkelindikatorer (`● ● ○ ○ ○ ○`) og stor "Lås op med vikarkode"-knap
+- [X] T179 [P] [US1] Ret FK-constraint fejl ved offline elevønske-sync i `apps/api/src/moduler/sync/sync-service.ts`: Erstat nil-UUID fallback for `registreret_af` med automatisk opslag på aktiv databasebruger for at undgå transaktions-rollback
+- [X] T180 [P] [US1] Implementér elevønske-rydning og niveaugruppering i `apps/web/src/stald/OenskerLektionSide.tsx`: Tilføj `🗑️ Ryd alle ønsker` i bunden af modalen og `Ryd valg` i statuslinjen; opdatér straks elevkortets status (grøn til gul/mangler) og persister i IndexedDB
+- [X] T181 [P] [US3] Implementér heste-sundhedsoverblik i `apps/web/src/stald/HesteOversigtSide.tsx`: Interaktiv KPI-bjælke i toppen med tællere for Alle heste, Raske/Aktive, Sygemeldte og Skadede/Obs med direkte klik-filtrering
+- [X] T182 [P] [US1] Implementér månedskalender-endpoint i `apps/api/src/moduler/sync/pull-service.ts` og `apps/api/src/moduler/sync/routes.ts`: `GET /stald/kalender/:maaned`: returnerer liste over datoer med lektionstælling til månedskalendervisning
+- [X] T183 [P] [US1] Implementér smart datonavigation og månedskalender pop-up i `apps/web/src/stald/IDagSide.tsx`: Knapper til "Forrige program" og "Næste program" der springer direkte til nærmeste dato med hold; pop-up modal med månedskalender og holdindikatorer; "Ingen hold i dag" empty-state med genvej
+- [X] T184 [P] [US3] Implementér Light Mode styling og on-demand visning af vikarkoder i `apps/web/src/admin/VikarKoderSide.tsx`, `apps/api/src/moduler/auth/vikar-service.ts` og `packages/contracts/src/stald.ts`: Masker koder som standard (`••••••`), tilføj øje-ikon (`👁️` / `🙈`) til at vise/skjule klartekst on-demand, tilføj kopiér-knap (`📋`), restyl til lys palette, og tilføj caching i hukommelse og localStorage
+- [X] T185 [P] [US2] Implementér komplet elevønskestyring for samtlige elever i `apps/web/src/admin/oensker/OenskerSide.tsx`: Vis alle aktive elever med niveau, filtre (alle, mangler, har afgivet), søgefelt, dialog til indtastning/redigering og knap til `🗑️ Ryd alle ønsker`
+- [X] T186 [P] [US3] Implementér hurtigredigering af hestesundhed og staldnoter i `apps/web/src/admin/heste/HesteSide.tsx` og `packages/contracts/src/stamdata.ts`: Udvid `HestOpdatering` med `sundhedsstatus` og `aktiv`; tilføj KPI-overblikskort med filtrering; tilføj inline status-dropdown direkte i tabellen og redigering af staldnoter
+- [X] T187 [P] Konfigurér fuld ugeplanssimulering og fjern netværksadvarsler i `tools/seed/index.ts`, `tools/seed/skriv-seed.ts`, `apps/api/src/server.ts` og `apps/web/vite.config.ts`: Sæt default seed til scenariet `'fuld'` (29 hold mandag–søndag), differentier mellem publiceret oktober vs. opstartet november for kabaledemo; bind server til `0.0.0.0` og ret Vite proxy target til `127.0.0.1:3000`
+
+**Checkpoint (Drift & UX Polish Fuldendt)**: Både Stald-appen og Admin Dashboardet understøtter komplet administration af ønsker, hestesundhed, vikaradgang og smart datonavigation, fuldt verificeret med typecheck og automatiserede tests.
+
+---
+
+## 2.8 Fase 4: Pilotdrift, Rytterstyring, Tablet Ergonomi & Admin Navigation (F2-H)
+
+**Formål**: Implementering af brugerfeedback fra pilotafprøvning: Oprettelse og sletning af ryttere, elevønske-statistik på kabalesiden, isoleret print-bon for vikarkoder, kategoriseret admin navigation med hover-dropdowns og notifikationsikon, udvidet erstatningsvælger for leder/lærer, handsketilpasset vikarflade, staldelevs redigering af staldnoter, oprydning i lektionsønsker og sikkerhedssortering af elever i lektionslisten.
+
+- [X] T188 [P] [US4] Implementér oprettelse og sletning/deaktivering af ryttere i `apps/web/src/admin/ryttere/RyttereSide.tsx`, `apps/api/src/moduler/ryttere/routes.ts` og `apps/api/src/moduler/ryttere/rytter-service.ts`: Dialog til oprettelse af ny rytter med validerede stamdata og sikkerhedsprofil; slet/deaktiver funktion med bekræftelse og validering mod aktive holdtilmeldinger
+- [X] T189 [P] [US2] Implementér elevønske-statistik for næste måned i `apps/web/src/admin/kabale/KabaleSide.tsx`: Visning af statistikoversigt over indsamlede ønsker (fordeling af 3/3, 1–2, 0 ønsker samt mest ønskede heste) før kabalekørsel
+- [X] T190 [P] [US3] Implementér isoleret `@media print` styling for vikarkoder i `apps/web/src/admin/VikarKoderSide.tsx`: Sikr at "Udskriv seddel" udelukkende printer en ren voucher-seddel med kode og instruks uden admin-layout og baggrunde
+- [X] T191 [P] [US4] Omstrukturér admin-navigation med kategorier og hover-dropdowns i `apps/web/src/admin/AdminLayout.tsx`: Gruppér menupunkter (Drift & Stald, Kabale & Tildeling, Stamdata); notifikationsikon i øverste højre hjørne; standardvisning til Ledelsesoverblik (`/admin`) via logoet
+- [X] T192 [P] [US3] Udvidet hesteerstatningsvælger for Ledelse og Ridelærere i `apps/web/src/stald/ErstatHestSide.tsx`: Tillad valg af alle øvrige egnede heste samt uegnede heste i absolutte nødstilfælde med advarsel for Leder/Lærer; fasthold vikarer strengt låst til godkendte top-3
+- [X] T193 [P] [US3] Forbedr tablet-ergonomi for vikarfladen i `apps/web/src/stald/VikarSide.tsx`: Forstørrede touch-targets (min. 56px), dedikeret stor knap "➕ Ny vikar / Indtast navn" ved siden af dropdown, og tydelig "Skift vikar / tast nyt navn" knap optimeret til handsker
+- [X] T194 [P] [US1] [US3] Tillad Staldelever at redigere hestes staldnoter i `apps/api/src/moduler/heste/routes.ts`, `apps/web/src/stald/HesteSide.tsx` og `apps/web/src/admin/heste/HesteSide.tsx`: Opdater RBAC-rettigheder og UI så Staldelever kan redigere og gemme staldnoter
+- [X] T195 [P] [US1] Fjern redundant "Ønsker"-knap/kolonne fra lektionsoversigten i `apps/web/src/stald/LektionSide.tsx`
+- [X] T196 [P] [US1] Sikkerhedssortering og diskret advarselsindikator i lektionslisten i `apps/web/src/stald/LektionSide.tsx`: Sorter elever med sikkerhedskoder/instrukser øverst; skjul koderne i listen og vis udelukkende `⚠️ Sikkerhedsprofil` med henvisning til Cheat Sheet
+- [X] T197 [P] [US4] Forbedr Heatmap hviledag visualisering i `apps/web/src/admin/DashboardSide.tsx`: Lyseblå nuance (`bg-sky-50 text-sky-700 border-sky-200`) for fredelige hviledage med 0 lektioner, og markant blå kant med rødt fyld (`bg-rose-100 text-rose-800 ring-2 ring-sky-500`) for heste, der mod reglerne har lektioner på en hviledag
+- [X] T198 [P] [US3] Udeluk hviledag og differentier uegnethedsårsager for erstatningsheste i `apps/web/src/stald/ErstatHestSide.tsx`: Heste med hviledag på lektionsdagen eller max dagsbelastning udelukkes fra øvrige egnede; differentier årsager for niveau, hviledag, dagsbelastning, helbred og rytterprofil
+- [X] T199 [P] [US3] Udeluk heste allerede tildelt på samme lektion i `packages/domain/src/erstatning/foreslaa-erstatninger.ts`, `apps/api/src/moduler/lektioner/omplacering-service.ts` og `apps/web/src/stald/ErstatHestSide.tsx`: Heste optaget på lektionen afvises i top-3 og i øvrige egnede; vises under uegnede med årsag "Allerede optaget på denne lektion"
+
+## 2.9 Fase 5: Pilot Polish – Sortering, Rapportvisning, Ventelister & Tablet Ergonomi (F2-I)
+
+- [X] T200 [P] [US1] Opsagte elever på holdlisten i `apps/web/src/stald/LektionSide.tsx` og `apps/web/src/stald/IDagSide.tsx`: Visning af "Elev opsagt" i stedet for udebliver-knapper samt rød advarselsstyling
+- [X] T201 [P] [US4] Kolonnesortering i ryttertabellen i `apps/web/src/admin/ryttere/RyttereSide.tsx`: Sortering efter navn, niveau, højde, partaftale og aktiv status
+- [X] T202 [P] [US4] Flyt Vikarkoder til menuen "Rapporter & Kontrol" i `apps/web/src/admin/AdminLayout.tsx`
+- [X] T203 [P] [US4] Fix aktiv fane styling bug i `apps/web/src/admin/AdminLayout.tsx`: Ret logik så "Rapporter & Kontrol" ikke fremstår aktiv på dashboardet
+- [X] T204 [P] [US4] Modal forhåndsvisning af historiske rapportudtræk i `apps/web/src/admin/RapporterSide.tsx`: "👁️ Se rapport" knap og datatabel-popup
+- [X] T205 [P] [US4] Manuel tilføjelse til ventelister i `apps/web/src/admin/VentelisteSide.tsx` og `apps/api/src/moduler/venteliste/`: Oprettelsesmodal for ventelistepladser
+- [X] T206 [P] [US3] Handsketilpasset vikarvælger modal i `apps/web/src/stald/VikarSide.tsx`: Erstat dropdown med pop-up vælger af store knapper og fjern redundant skift-knap
+- [X] T207 [P] [US3] Vertikal optimering og header-knapper i `apps/web/src/stald/VikarSide.tsx` og `apps/web/src/stald/LaasSide.tsx`: Flyt tilbage-knap og heste-ikon til toppen
+- [X] T208 [P] [US1] Prioriteret sortering og differentieret styling i `apps/web/src/stald/LektionSide.tsx`: Sygemeldte hestepar øverst med gul glød, dæmpet orange for profil og rød for opsagt
+- [X] T209 [P] [US3] Boy hviledag fremhævning og oprydning i top-3 kort i `apps/web/src/stald/ErstatHestSide.tsx`: Fremhæv hviledag i uegnede heste og fjern gentaget dagsbelastning i top-3
+
+**Checkpoint (Pilotforbedringer Fuldendt)**: Samtlige brugerønsker for både stald-tabletten og admin dashboardet er implementeret, integreret og testet.
+
+---
+
+## 2.10 Fase 6: Showcase – Manuel Fordeling fra Case (Oktober) vs. Motor (November) (F2-J)
+
+- [X] T210 [P] [US2] Evaluér Maries manuelle fordeling med Welfare Guard ved seed i `tools/seed/skriv-seed.ts`: Kør `validerPlan` på oktober-historikken, gem overtrædelserne i `welfare_guard_resultat` og mærk kørslen med solver_version `'manuel-papirark'`
+- [X] T211 [P] [US2] Showcase UI i kabaleoversigten i `apps/web/src/admin/kabale/KoerselOversigt.tsx`: Tydelig badge og banner for manuel fordeling med formateret liste over velfærdsbrud (overbelastning, hviledage osv.) kontra motorens fejlfri kørsel for november
+
+---
+
+## 2.11 Fase 7: Pilot Polish – Kabaleindstillinger, Særtilladelse & Heatmap Status (F2-K)
+
+- [X] T212 [P] [US2] Indstillingsmodal på kabalen i `apps/web/src/admin/kabale/KabaleSide.tsx`: Gearcog-ikon med toggles for "Reserver begynder-heste til begynderhold først" og "Reserver spring-heste til springhold først"
+- [X] T213 [P] [US2] Solver-prioritering af reserverede heste i `packages/domain/src/motor/mrv-greedy-solver.ts`: Sorteringsprioritet for begynder- og springhold med -200 strafpoint ved brug på andre hold
+- [X] T214 [P] [US2] "Ikke tildelt" advarselsboks og justerings-modal i `apps/web/src/admin/kabale/`: Rød badge ved ufordelte elever, liste over elever pr. hold, niveaudispensation og knappen `⚡ Særtildel alle (dispensation)`
+- [X] T215 [P] [US4] Forbedret månedsvælger og Status-kolonne i Heatmap i `apps/web/src/admin/DashboardSide.tsx` og `apps/api/src/moduler/dashboard/dashboard-service.ts`
+- [X] T216 [P] [US1] Husk valgt dato ved retur fra holdlektion i `apps/web/src/stald/IDagSide.tsx`: Gem og gendan `stald_valgt_dato` via `sessionStorage`
+
+---
+
+## 2.12 Fase 8: Pilot Polish – Interaktiv Filtrering, Heste-Tags & Staldelevsbeføjelser (F2-L)
+
+- [X] T217 [P] [US4] Interaktiv kapacitets- og temperamentfiltrering med banner i `apps/web/src/admin/heste/HesteSide.tsx` og `apps/web/src/admin/DashboardSide.tsx`: Klikbare nøgletalskort, tabel/heatmap filtrering og `[Reset]` banner
+- [X] T218 [P] [US1] Elevønsker hestekort-badges og reservationstekster i `apps/web/src/stald/OenskerLektionSide.tsx`: `👶 Begynderhest`, `🏇 Springhest`, `🛡️ Skånehest` badges og vejledning
+- [X] T219 [P] [US3] Udvidet redigering for staldelever i `apps/api/src/moduler/heste/routes.ts` og `apps/web/src/stald/HesteOversigtSide.tsx`: Tillad Staldelev at opdatere temperament, skåne og staldnoter på tabletten
+
+---
+
 ## Afhængigheder og rækkefølge
 
 ### Sektionsafhængigheder i Fase 1 (Gennemført)

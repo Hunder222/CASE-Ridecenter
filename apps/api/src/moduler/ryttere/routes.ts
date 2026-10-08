@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { IdParams } from '../../faelles';
 import { aktuelBruger, kraevRoller } from '../../plugins/rbac';
 import { rytterDto } from './mapper';
-import { opdaterRytter, opretRytter } from './service';
+import { opdaterRytter, opretRytter, sletRytter } from './service';
 import { sikkerhedsprofilRuter } from './sikkerhedsprofil';
 
 // Ryttere (FR-002). Kun Ledelse: admin-projektionen har kontaktoplysninger og fysiske data.
@@ -32,6 +32,16 @@ export const rytterRuter: FastifyPluginAsyncZod = async (app) => {
     },
     async (request) =>
       opdaterRytter(app.prisma, request.params.id, request.body, aktuelBruger(request), app.ur()),
+  );
+
+  app.delete(
+    '/ryttere/:id',
+    {
+      onRequest: kunLedelse,
+      schema: { params: IdParams, response: { 200: z.object({ ok: z.boolean(), status: z.string() }) } },
+    },
+    async (request) =>
+      sletRytter(app.prisma, request.params.id, aktuelBruger(request), app.ur()),
   );
 
   await app.register(sikkerhedsprofilRuter);

@@ -3,6 +3,7 @@ import type {
   Hestetildeling,
   KandidatHest,
   PubliceringSvar,
+  SaertildelSvar,
   Tildelingskoersel,
 } from '@ridecenter/contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -35,12 +36,34 @@ export function useKoersel(id: string | null) {
 export function useKoerTildeling() {
   const queryKlient = useQueryClient();
   return useMutation({
-    mutationFn: (maaned: string) =>
-      api<Tildelingskoersel>('/tildeling/koersler', { metode: 'POST', body: { maaned } }),
+    mutationFn: (param: string | { maaned: string; reserverBegynderHeste?: boolean; reserverSpringHeste?: boolean }) => {
+      const body = typeof param === 'string'
+        ? { maaned: param }
+        : {
+            maaned: param.maaned,
+            reserver_begynder_heste: param.reserverBegynderHeste,
+            reserver_spring_heste: param.reserverSpringHeste,
+          };
+      return api<Tildelingskoersel>('/tildeling/koersler', { metode: 'POST', body });
+    },
     onSuccess: (koersel) => {
       queryKlient.setQueryData(kabaleNoegler.koersel(koersel.id), koersel);
       void queryKlient.invalidateQueries({ queryKey: kabaleNoegler.koersler(koersel.maaned) });
       void queryKlient.invalidateQueries({ queryKey: kabaleNoegler.notifikationer });
+    },
+  });
+}
+
+export function useSaertildelAlle(koerselId: string) {
+  const queryKlient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api<SaertildelSvar>(`/tildeling/koersler/${koerselId}/saertildel-alle`, {
+        metode: 'POST',
+      }),
+    onSuccess: (svar) => {
+      queryKlient.setQueryData(kabaleNoegler.koersel(koerselId), svar.koersel);
+      void queryKlient.invalidateQueries({ queryKey: kabaleNoegler.koersler(svar.koersel.maaned) });
     },
   });
 }
@@ -57,10 +80,20 @@ export function useKandidater(koerselId: string, tildelingId: string) {
 export function useJusterTildeling(koerselId: string) {
   const queryKlient = useQueryClient();
   return useMutation({
-    mutationFn: ({ tildelingId, hestId }: { tildelingId: string; hestId: string }) =>
+    mutationFn: ({
+      tildelingId,
+      hestId,
+      tilladNiveauDispensation,
+    }: {
+      tildelingId: string;
+      hestId: string;
+      tilladNiveauDispensation?: boolean;
+    }) =>
       api<Hestetildeling>(`/tildeling/koersler/${koerselId}/tildelinger/${tildelingId}`, {
         metode: 'PATCH',
-        body: { hest_id: hestId },
+        body: tilladNiveauDispensation
+          ? { hest_id: hestId, tillad_niveau_dispensation: true }
+          : { hest_id: hestId },
       }),
     onSuccess: () => {
       void queryKlient.invalidateQueries({ queryKey: kabaleNoegler.koersel(koerselId) });

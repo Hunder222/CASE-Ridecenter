@@ -33,6 +33,8 @@ export interface ForeslaaErstatningerInput {
   heste: readonly StaldHestKandidat[];
   dagsbelastninger: DagsbelastningMap;
   lektionUgedag: Ugedag;
+  /** Heste-ID'er der allerede er optaget på den aktuelle lektion af andre ryttere. */
+  optagedeHesteIds?: readonly string[];
 }
 
 /**
@@ -44,6 +46,7 @@ export interface ForeslaaErstatningerInput {
  * 2. Heste med sundhedsstatus != 'Aktiv' (f.eks. Sygemeldt, Skadet).
  * 3. Heste der har nået max_lektioner_dag (3 for normale, 2 for skåne) inkl. den nye lektion.
  * 4. Heste der har hviledag på lektionens ugedag.
+ * 5. Heste der allerede er tildelt en rytter på den aktuelle lektion.
  *
  * Sortering:
  * 1. Færrest dagsbelastninger først.
@@ -51,10 +54,14 @@ export interface ForeslaaErstatningerInput {
  * 3. Hestens navn alfabetisk som tie-breaker.
  */
 export function foreslaaErstatninger(input: ForeslaaErstatningerInput): Top3Forslag[] {
-  const { plads, heste, dagsbelastninger, lektionUgedag } = input;
+  const { plads, heste, dagsbelastninger, lektionUgedag, optagedeHesteIds = [] } = input;
   const godkendteSet = new Set(plads.godkendteHeste);
+  const optagedeSet = new Set(optagedeHesteIds);
 
   const kandidater = heste.filter((hest) => {
+    // 0. Må ikke allerede være optaget på denne lektion
+    if (optagedeSet.has(hest.id)) return false;
+
     // 1. Skal være i rytterens godkendte heste
     if (!godkendteSet.has(hest.id)) return false;
 

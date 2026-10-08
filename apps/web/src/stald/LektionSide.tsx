@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import type { FremmoedeStatus } from '@ridecenter/contracts';
 import { db, type LokalHest, type LokalLektion, type LokalPlads } from '../offline/dexie-db';
@@ -17,6 +17,9 @@ export function LektionSide() {
 
   // Korrigeringsdialog state (bruges ved ændringer efter holdet er afsluttet)
   const [korrigerPlads, setKorrigerPlads] = useState<LokalPlads | null>(null);
+
+  // Tilstand til at vise store 'Erstat hest' knapper på alle ryttere
+  const [redigerHesteTilstand, setRedigerHesteTilstand] = useState(false);
 
   const hentData = async () => {
     if (!id) return;
@@ -82,6 +85,7 @@ export function LektionSide() {
                 aktuelHestId: pl.aktuel_hest_id,
                 planlagtHestId: pl.planlagt_hest_id,
                 status: pl.afledt_status,
+                rytterStatus: pl.rytter_status,
                 godkendteHeste: pl.godkendte_heste,
                 cheatSheetKoder: pl.cheat_sheet_koder,
                 adfaerdsinstruks: pl.adfaerdsinstruks,
@@ -105,6 +109,31 @@ export function LektionSide() {
   useEffect(() => {
     hentData();
   }, [id]);
+
+  // Sortering (Fase 5 / T208):
+  // 1. Prioritet: Rytter+hest par med advarsel (sygemeldt/skadet hest)
+  // 2. Prioritet: Sikkerhedskoder / instrukser
+  // 3. Prioritet: Opsagte elever
+  // 4. Øvrige sorteret alfabetisk
+  const sorteredePladser = useMemo(() => {
+    return [...pladser].sort((a, b) => {
+      const aHest = a.aktuelHestId ? hesteMap.get(a.aktuelHestId) : null;
+      const bHest = b.aktuelHestId ? hesteMap.get(b.aktuelHestId) : null;
+      const aHestSyg = Boolean(aHest && aHest.sundhedsstatus && aHest.sundhedsstatus !== 'Aktiv');
+      const bHestSyg = Boolean(bHest && bHest.sundhedsstatus && bHest.sundhedsstatus !== 'Aktiv');
+      if (aHestSyg !== bHestSyg) return aHestSyg ? -1 : 1;
+
+      const aHarKode = (a.cheatSheetKoder && a.cheatSheetKoder.length > 0) || Boolean(a.adfaerdsinstruks);
+      const bHarKode = (b.cheatSheetKoder && b.cheatSheetKoder.length > 0) || Boolean(b.adfaerdsinstruks);
+      if (aHarKode !== bHarKode) return aHarKode ? -1 : 1;
+
+      const aErOpsagt = a.rytterStatus === 'Opsagt';
+      const bErOpsagt = b.rytterStatus === 'Opsagt';
+      if (aErOpsagt !== bErOpsagt) return aErOpsagt ? -1 : 1;
+
+      return (a.rytterNavnKort ?? '').localeCompare(b.rytterNavnKort ?? '', 'da');
+    });
+  }, [pladser, hesteMap]);
 
   // Holdet er kun lukket, hvis der er foretaget "Afslut hold"
   const erLukket = Boolean(lektion?.fremmoedeLukket);
@@ -229,20 +258,27 @@ export function LektionSide() {
           <span>Dagens hold</span>
         </button>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setRedigerHesteTilstand((curr) => !curr)}
+            className={`min-h-[48px] px-3.5 rounded-xl border font-bold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer transition shadow-sm active:scale-95 ${
+              redigerHesteTilstand
+                ? 'bg-amber-500 text-stone-950 border-amber-300 ring-2 ring-amber-400'
+                : 'bg-slate-800 hover:bg-slate-750 text-slate-200 border-slate-700'
+            }`}
+            title="Vis store 'Erstat hest' knapper på alle ryttere på holdet"
+          >
+            <span>🔄</span>
+            <span>{redigerHesteTilstand ? 'Afslut omplacering' : 'Redigér heste'}</span>
+          </button>
+
           <button
             type="button"
             onClick={() => navigate(`/stald/lektion/${id}/cheat-sheet`)}
             className="min-h-[48px] px-3.5 rounded-xl bg-indigo-950/70 hover:bg-indigo-900 text-indigo-200 border border-indigo-700/80 font-semibold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer"
           >
             🛡️ Cheat Sheet
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate(`/stald/oensker/${id}`)}
-            className="min-h-[48px] px-3.5 rounded-xl bg-sky-900/60 hover:bg-sky-850 text-sky-200 border border-sky-700/80 font-semibold text-xs sm:text-sm cursor-pointer"
-          >
-            ⭐ Ønsker
           </button>
           {erLukket ? (
             <span className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-amber-950/80 text-amber-300 border border-amber-700/60 flex items-center gap-1.5">
@@ -315,34 +351,68 @@ export function LektionSide() {
         </button>
       )}
 
-      {/* Elevliste */}
+      {/* Elevliste (sorteret: 1. Sygemeldt hest, 2. Sikkerhedsprofil, 3. Opsagt elev, 4. Øvrige) */}
       <div className="space-y-3">
-        {pladser.map((plads) => {
+        {sorteredePladser.map((plads) => {
           const erFremmoedt = plads.status === 'Fremmoedt';
           const erUdeblevet = plads.status === 'Udeblevet';
           const hest = plads.aktuelHestId ? hesteMap.get(plads.aktuelHestId) : null;
           const hestErSyg = Boolean(hest && hest.sundhedsstatus && hest.sundhedsstatus !== 'Aktiv');
+          const harSikkerhedsprofil =
+            (plads.cheatSheetKoder && plads.cheatSheetKoder.length > 0) || Boolean(plads.adfaerdsinstruks);
+          const erOpsagt = plads.rytterStatus === 'Opsagt';
 
           return (
             <div
               key={plads.id}
-              className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition shadow-md ${
-                hestErSyg
-                  ? 'bg-rose-950/20 border-rose-900/80 ring-1 ring-rose-700/50'
+              className={`rounded-2xl border p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition shadow-md relative overflow-hidden ${
+                erOpsagt
+                  ? 'bg-rose-950/40 border-rose-600/90 ring-1 ring-rose-500/60'
+                  : hestErSyg
+                  ? 'bg-amber-950/40 border-amber-500 ring-2 ring-amber-400/50 shadow-amber-950/50'
+                  : harSikkerhedsprofil
+                  ? 'bg-slate-900/95 border-amber-800/40'
                   : 'bg-slate-900/90 border-slate-800/80'
               }`}
             >
-              <div className="flex-1 min-w-0">
-                <div className="text-lg font-bold text-white truncate">
-                  {plads.rytterNavnKort ?? 'Rytter'}
+              <div className="flex-1 min-w-0 sm:pl-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-bold text-white truncate">
+                    {plads.rytterNavnKort ?? 'Rytter'}
+                  </span>
+
+                  {erOpsagt && (
+                    <span
+                      className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-rose-600 text-white text-xs font-black shadow-sm"
+                      title="Eleven er opsagt"
+                    >
+                      !
+                    </span>
+                  )}
+
+                  {!erOpsagt && hestErSyg && (
+                    <span
+                      className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-400 text-stone-950 text-xs font-black shadow-sm"
+                      title="Advarsel: Sygemeldt/skadet hest tildelt"
+                    >
+                      !
+                    </span>
+                  )}
+
+                  {erOpsagt && (
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-rose-900/80 text-rose-200 border border-rose-600 font-bold">
+                      ⛔ Elev opsagt
+                    </span>
+                  )}
                 </div>
+
                 <div className="text-sm text-slate-400 flex flex-wrap items-center gap-2 mt-1">
                   <span className="font-medium text-slate-300">Hest:</span>
                   {hest ? (
-                    <span className={`font-semibold ${hestErSyg ? 'text-rose-400 flex items-center gap-1.5' : 'text-slate-200'}`}>
+                    <span className={`font-semibold ${hestErSyg ? 'text-amber-300 flex items-center gap-1.5' : 'text-slate-200'}`}>
                       {hest.navn}
                       {hestErSyg && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-700 font-bold">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-600 font-bold">
                           ⚠️ {hest.sundhedsstatus}
                         </span>
                       )}
@@ -353,50 +423,69 @@ export function LektionSide() {
                     </span>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/stald/plads/${plads.id}/erstat`)}
-                    className={`px-3 py-1 rounded-xl text-xs font-semibold border cursor-pointer transition flex items-center gap-1.5 ${
-                      hestErSyg
-                        ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-400 shadow-md ring-2 ring-amber-400/50'
-                        : 'bg-slate-800 hover:bg-slate-750 text-sky-300 border-slate-700'
-                    }`}
-                  >
-                    🔄 Erstat hest
-                  </button>
-
-                  {plads.cheatSheetKoder && plads.cheatSheetKoder.length > 0 && (
-                    <span className="px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-400 font-mono">
-                      {plads.cheatSheetKoder.join(', ')}
-                    </span>
+                  {harSikkerhedsprofil && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/stald/lektion/${id}/cheat-sheet`)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-amber-950/40 text-amber-300 border border-amber-800/40 hover:bg-amber-900/50 transition cursor-pointer"
+                      title="Eleven har særlige sikkerhedskoder/instrukser. Klik for at se Cheat Sheet."
+                    >
+                      <span>⚠️</span>
+                      <span>Sikkerhedsprofil</span>
+                    </button>
                   )}
                 </div>
               </div>
 
-              {/* Status toggle knapper */}
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => haandterSaetStatus(plads, 'Fremmoedt')}
-                  className={`min-h-[52px] px-5 rounded-xl font-bold text-sm transition-all flex items-center gap-1.5 cursor-pointer ${
-                    erFremmoedt
-                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/40 ring-2 ring-emerald-400'
-                      : 'bg-slate-800 hover:bg-slate-750 text-slate-400 border border-slate-700'
-                  }`}
-                >
-                  ✓ Fremmødt
-                </button>
-                <button
-                  type="button"
-                  onClick={() => haandterSaetStatus(plads, 'Udeblevet')}
-                  className={`min-h-[52px] px-5 rounded-xl font-bold text-sm transition-all flex items-center gap-1.5 cursor-pointer ${
-                    erUdeblevet
-                      ? 'bg-rose-600 text-white shadow-md shadow-rose-950/40 ring-2 ring-rose-400'
-                      : 'bg-slate-800 hover:bg-slate-750 text-slate-400 border border-slate-700'
-                  }`}
-                >
-                  ✗ Udeblevet
-                </button>
+              {/* Action area: Stor Erstat hest knap (synlig efter tryk af "Redigér heste" i toppen) + Fremmøde knapper */}
+              <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+                {redigerHesteTilstand && !erOpsagt && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/stald/plads/${plads.id}/erstat`)}
+                    className={`min-h-[52px] px-4 rounded-xl font-bold text-sm flex items-center gap-1.5 transition-all shadow-md active:scale-95 cursor-pointer whitespace-nowrap ${
+                      hestErSyg
+                        ? 'bg-amber-500 hover:bg-amber-400 text-stone-950 ring-2 ring-amber-300 font-black'
+                        : 'bg-sky-600 hover:bg-sky-500 text-white border border-sky-400 shadow-sky-950/40'
+                    }`}
+                    title="Vælg ny erstatningshest til denne rytter"
+                  >
+                    <span>🔄</span>
+                    <span>Erstat hest</span>
+                  </button>
+                )}
+
+                {erOpsagt ? (
+                  <div className="min-h-[52px] px-5 rounded-xl bg-rose-950/60 border border-rose-800 text-rose-300 text-sm font-bold flex items-center gap-2">
+                    <span>⛔</span>
+                    <span>Elev opsagt</span>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => haandterSaetStatus(plads, 'Fremmoedt')}
+                      className={`min-h-[52px] px-5 rounded-xl font-bold text-sm transition-all flex items-center gap-1.5 cursor-pointer ${
+                        erFremmoedt
+                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/40 ring-2 ring-emerald-400'
+                          : 'bg-slate-800 hover:bg-slate-750 text-slate-400 border border-slate-700'
+                      }`}
+                    >
+                      ✓ Fremmødt
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => haandterSaetStatus(plads, 'Udeblevet')}
+                      className={`min-h-[52px] px-5 rounded-xl font-bold text-sm transition-all flex items-center gap-1.5 cursor-pointer ${
+                        erUdeblevet
+                          ? 'bg-rose-600 text-white shadow-md shadow-rose-950/40 ring-2 ring-rose-400'
+                          : 'bg-slate-800 hover:bg-slate-750 text-slate-400 border border-slate-700'
+                      }`}
+                    >
+                      ✗ Udeblevet
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           );

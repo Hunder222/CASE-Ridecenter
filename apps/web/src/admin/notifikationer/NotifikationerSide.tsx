@@ -37,6 +37,34 @@ function Tekst({ notifikation }: { notifikation: DashboardNotifikation }) {
           </Link>
         </p>
       );
+    case 'VIKAR_LOGIN': {
+      const vikarNavn = felt('vikar_navn') || 'Ukendt vikar';
+      const advarsel = felt('advarsel');
+      const erFejl = notifikation.payload['fejlet'] === true;
+
+      if (erFejl) {
+        return (
+          <p className="text-rose-800 font-medium">
+            <span className="font-bold mr-1">⚠️ Sikkerhedsadvarsel:</span>
+            {advarsel ? `${advarsel} af ` : 'Mislykket vikarlogin af '}
+            <span className="font-bold">"{vikarNavn}"</span> på staldfladen.{' '}
+            <Link to="/admin/vikarkoder" className="text-rose-950 underline font-semibold ml-1">
+              Se vikarkoder
+            </Link>
+          </p>
+        );
+      }
+
+      return (
+        <p>
+          <span className="mr-1">🐎</span>
+          <span className="font-bold">{vikarNavn}</span> har låst staldfladen op med vikarkode.{' '}
+          <Link to="/admin/vikarkoder" className="text-emerald-800 underline ml-1">
+            Udsted ny beredskabskode
+          </Link>
+        </p>
+      );
+    }
     default:
       return (
         <p>

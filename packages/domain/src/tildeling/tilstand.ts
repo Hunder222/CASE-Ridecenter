@@ -71,6 +71,8 @@ export interface Plads {
   fast: 'paakraevet' | 'part' | null;
   /** SC-04-bonussen afgjorde valget. */
   sc04: boolean;
+  reserverBegynderHeste?: boolean;
+  reserverSpringHeste?: boolean;
 }
 
 export interface Motor {
@@ -112,6 +114,8 @@ export function fjern(motor: Motor, plads: Plads): void {
 /** Lovlige kandidater for pladsen, bedste først (domain-engine.md §6 f). */
 export function rangerKandidater(motor: Motor, plads: Plads, kunLovlige = true): Kandidat[] {
   const kandidater: Kandidat[] = [];
+  const erBegynder = plads.hold.niveau === 'Begynder' || plads.hold.niveau === 'Traekhold';
+  const erSpring = plads.hold.erSpringhold;
   for (const hestId of plads.egnethed.godkendte) {
     const hest = motor.heste.get(hestId);
     if (!hest || (kunLovlige && !lovlig(motor, plads, hestId))) continue;
@@ -120,7 +124,16 @@ export function rangerKandidater(motor: Motor, plads: Plads, kunLovlige = true):
     kandidater.push({
       hestId,
       ugebelastning,
-      score: scoreHest({ oenskePrioritet, ugebelastning, rytter: plads.rytter, hest }),
+      score: scoreHest({
+        oenskePrioritet,
+        ugebelastning,
+        rytter: plads.rytter,
+        hest,
+        erBegynderHold: erBegynder,
+        reserverBegynderHeste: plads.reserverBegynderHeste,
+        erSpringHold: erSpring,
+        reserverSpringHeste: plads.reserverSpringHeste,
+      }),
     });
   }
   return kandidater.sort(sammenlignKandidater);

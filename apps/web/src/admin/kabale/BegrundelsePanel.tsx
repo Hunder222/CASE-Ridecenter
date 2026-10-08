@@ -3,7 +3,12 @@ import type { Ref } from 'react';
 import { Badge, type BadgeVariant } from '../../faelles/ui/Badge';
 
 function variantFor(kode: string): BadgeVariant {
-  if (kode.startsWith('HC') || kode === 'LEKTION_HEST_OPTAGET' || kode === 'IKKE_TILDELT_KAPACITET')
+  if (
+    kode.startsWith('HC') ||
+    kode === 'LEKTION_HEST_OPTAGET' ||
+    kode === 'IKKE_TILDELT_KAPACITET' ||
+    kode === 'IKKE_GODKENDT_TIL_RYTTER'
+  )
     return 'fejl';
   if (kode.startsWith('SC')) return 'info';
   return 'neutral';

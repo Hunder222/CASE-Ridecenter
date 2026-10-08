@@ -45,6 +45,8 @@ export type HestInput = z.infer<typeof HestInput>;
 /** Delvis opdatering. Uden defaults, så felter, der ikke sendes, ikke nulstilles (Zod 4 anvender defaults i partial). */
 export const HestOpdatering = HestInput.extend({
   staldnoter: z.string().max(500, 'Staldnoter må højst være 500 tegn'),
+  sundhedsstatus: Sundhedsstatus,
+  aktiv: z.boolean(),
 }).partial();
 export type HestOpdatering = z.infer<typeof HestOpdatering>;
 

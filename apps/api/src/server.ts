@@ -9,4 +9,4 @@ indlaesEnv({ path: path.resolve(import.meta.dirname, '../../../.env'), quiet: tr
 
 const config = laesConfig();
 const app = await buildApp({ config, prisma: hentPrisma(), logger: true });
-await app.listen({ port: config.API_PORT });
+await app.listen({ port: config.API_PORT, host: '0.0.0.0' });

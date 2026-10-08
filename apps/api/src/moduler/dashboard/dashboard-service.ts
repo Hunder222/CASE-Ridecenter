@@ -9,7 +9,7 @@ export class DashboardService {
   /**
    * Beregner live ledelsesnøgletal og hestebelastnings-heatmap (US4, FR-016, T162).
    */
-  async hentNoegletal(): Promise<DashboardNoegletalSvar> {
+  async hentNoegletal(oensketMaaned?: string): Promise<DashboardNoegletalSvar> {
     // 1. Holdudnyttelse: antal aktive tilmeldinger vs. samlet max_kapacitet
     const holdListe = await this.prisma.hold.findMany({
       include: {
@@ -103,22 +103,45 @@ export class DashboardService {
       orderBy: { navn: 'asc' },
     });
 
-    // Hent alle planlagte lektionspladser og deres lektioners ugedage
+    // Find alle måneder der har kørsler
+    const alleKoersler = await this.prisma.tildelingskoersel.findMany({
+      orderBy: { oprettet: 'desc' },
+      select: { id: true, maaned: true, status: true },
+    });
+
+    const tilgaengeligeMaaneder = Array.from(new Set(alleKoersler.map((k) => k.maaned))).sort();
+
+    // Vælg måned: hvis specificeret brug den, ellers find seneste publicerede eller nyeste kørsel
+    let valgtMaaned = oensketMaaned;
+    if (!valgtMaaned || !tilgaengeligeMaaneder.includes(valgtMaaned)) {
+      const publiceret = alleKoersler.find((k) => k.status === 'Publiceret');
+      valgtMaaned = publiceret ? publiceret.maaned : (tilgaengeligeMaaneder[0] ?? '2026-10');
+    }
+
+    // Find den relevante kørsel for valgte måned (prioritér Publiceret, ellers seneste kørsel for måneden)
+    const koerslerForMaaned = alleKoersler.filter((k) => k.maaned === valgtMaaned);
+    const aktivKoersel =
+      koerslerForMaaned.find((k) => k.status === 'Publiceret') ?? koerslerForMaaned[0];
+
     const alleHold = await this.prisma.hold.findMany();
     const holdMap = new Map(alleHold.map((h) => [h.id, h]));
 
-    const hestetildelinger = await this.prisma.hestetildeling.findMany({
-      include: {
-        holdtilmelding: true,
-      },
-    });
-
     const belastningsMap = new Map<string, number>(); // `${hestId}:${ugedag}` -> antal
-    for (const t of hestetildelinger) {
-      const hold = holdMap.get(t.holdtilmelding.hold_id);
-      if (hold) {
-        const noegle = `${t.hest_id}:${hold.ugedag}`;
-        belastningsMap.set(noegle, (belastningsMap.get(noegle) ?? 0) + 1);
+    if (aktivKoersel) {
+      const hestetildelinger = await this.prisma.hestetildeling.findMany({
+        where: { koersel_id: aktivKoersel.id },
+        include: {
+          holdtilmelding: true,
+        },
+      });
+
+      for (const t of hestetildelinger) {
+        if (!t.hest_id) continue;
+        const hold = holdMap.get(t.holdtilmelding.hold_id);
+        if (hold) {
+          const noegle = `${t.hest_id}:${hold.ugedag}`;
+          belastningsMap.set(noegle, (belastningsMap.get(noegle) ?? 0) + 1);
+        }
       }
     }
 
@@ -134,6 +157,7 @@ export class DashboardService {
         hestBelastningsfordeling.push({
           hest_id: hest.id,
           hest_navn: hest.navn,
+          sundhedsstatus: hest.sundhedsstatus as any,
           ugedag,
           ugedag_navn: UGEDAGE[ugedag - 1] ?? `Dag ${ugedag}`,
           planlagte_lektioner: planlagte,
@@ -151,6 +175,8 @@ export class DashboardService {
       afventende_ventelisteforslag: afventendeForslag,
       gentaget_fravaer_advarsler: gentagetFravaerAdvarsler,
       hest_belastningsfordeling: hestBelastningsfordeling,
+      valgt_maaned: valgtMaaned,
+      tilgaengelige_maaneder: tilgaengeligeMaaneder,
     };
   }
 }

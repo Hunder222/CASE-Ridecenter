@@ -140,7 +140,7 @@ export async function logHaendelse(tx: Prisma.TransactionClient, h: NyHaendelse)
     server_tidspunkt: h.tidspunkt.toISOString(),
     klient_tidspunkt: h.klient_tidspunkt?.toISOString() ?? null,
     enhed_id: h.enhed_id ?? null,
-    bruger_id: h.bruger?.id ?? null,
+    bruger_id: h.bruger && !h.bruger.roller.includes('Vikar') ? h.bruger.id : null,
     bruger_navn: h.bruger?.navn ?? 'System',
     rolle: h.bruger ? primaerRolle(h.bruger) : 'System',
     handling: h.handling,

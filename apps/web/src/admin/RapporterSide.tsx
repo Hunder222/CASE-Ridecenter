@@ -60,6 +60,40 @@ export const RapporterSide: React.FC = () => {
     }
   };
 
+  const [visRapportModal, setVisRapportModal] = useState<any | null>(null);
+  const [modalCsvData, setModalCsvData] = useState<{ headers: string[]; rows: string[][] } | null>(null);
+  const [henterModalCsv, setHenterModalCsv] = useState(false);
+
+  const aabenRapportModal = async (rapport: any) => {
+    setVisRapportModal(rapport);
+    setHenterModalCsv(true);
+    setModalCsvData(null);
+    try {
+      const res = await fetch(`/api/v1/rapporter/tilsyn/${rapport.id}/download`);
+      if (res.ok) {
+        const tekst = await res.text();
+        const linjer = tekst.trim().split(/\r?\n/).filter(l => l.trim().length > 0);
+        if (linjer.length > 0) {
+          const splitRow = (row: string) => {
+            // Håndter semikolon eller komma seperator
+            const sep = row.includes(';') ? ';' : ',';
+            return row.split(sep).map(cell => cell.replace(/^"(.*)"$/, '$1').trim());
+          };
+          const foersteLinje = linjer[0];
+          if (foersteLinje) {
+            const headers = splitRow(foersteLinje);
+            const rows = linjer.slice(1).map(splitRow);
+            setModalCsvData({ headers, rows });
+          }
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setHenterModalCsv(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -152,12 +186,21 @@ export const RapporterSide: React.FC = () => {
               </p>
             </div>
 
-            <a
-              href={`/api/v1/rapporter/tilsyn/${rapportSvar.id}/download`}
-              className="min-h-[44px] px-5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold shadow flex items-center gap-1.5"
-            >
-              📥 Download CSV
-            </a>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => aabenRapportModal(rapportSvar)}
+                className="min-h-[44px] px-4 rounded-xl bg-white hover:bg-stone-100 text-stone-800 text-xs font-bold shadow-sm border border-stone-300 flex items-center gap-1.5 cursor-pointer"
+              >
+                👁️ Se rapport
+              </button>
+              <a
+                href={`/api/v1/rapporter/tilsyn/${rapportSvar.id}/download`}
+                className="min-h-[44px] px-5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold shadow flex items-center gap-1.5"
+              >
+                📥 Download CSV
+              </a>
+            </div>
           </div>
 
           {/* HASH KONTROLSUMMER */}
@@ -212,12 +255,20 @@ export const RapporterSide: React.FC = () => {
                     </td>
                     <td className="px-5 py-3.5 font-semibold text-stone-900">{h.antal_raekker}</td>
                     <td className="px-5 py-3.5 text-xs font-mono text-stone-500">{h.varighed_ms} ms</td>
-                    <td className="px-5 py-3.5 text-right">
+                    <td className="px-5 py-3.5 text-right space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => aabenRapportModal(h)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-pointer inline-flex items-center gap-1"
+                        title="Se rapportdata i tabel"
+                      >
+                        👁️ Se rapport
+                      </button>
                       <a
                         href={`/api/v1/rapporter/tilsyn/${h.id}/download`}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300"
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 inline-block"
                       >
-                        Download CSV
+                        📥 Download CSV
                       </a>
                     </td>
                   </tr>
@@ -227,6 +278,85 @@ export const RapporterSide: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* POPUP MODAL TIL VISNING AF RAPPORTDATA */}
+      {visRapportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[85vh] flex flex-col border border-stone-200 overflow-hidden">
+            <div className="p-5 border-b border-stone-200 flex items-center justify-between bg-stone-50">
+              <div>
+                <h3 className="text-lg font-bold text-stone-900">
+                  Rapportvisning: {new Date(visRapportModal.periode_fra).toLocaleDateString('da-DK')} – {new Date(visRapportModal.periode_til).toLocaleDateString('da-DK')}
+                </h3>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Genereret: {new Date(visRapportModal.genereret_tidspunkt).toLocaleString('da-DK')} • {visRapportModal.antal_raekker} rækker
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVisRapportModal(null)}
+                className="w-9 h-9 rounded-full bg-stone-200 hover:bg-stone-300 text-stone-700 flex items-center justify-center font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              {henterModalCsv ? (
+                <div className="py-12 text-center text-stone-500">Indlæser rapportdata...</div>
+              ) : !modalCsvData || modalCsvData.rows.length === 0 ? (
+                <div className="py-12 text-center text-stone-500">Ingen rækker fundet i rapporten.</div>
+              ) : (
+                <div className="border border-stone-200 rounded-xl overflow-x-auto">
+                  <table className="w-full text-left text-xs text-stone-700">
+                    <thead className="bg-stone-100 text-stone-600 font-semibold uppercase tracking-wider border-b border-stone-200">
+                      <tr>
+                        {modalCsvData.headers.map((h, i) => (
+                          <th key={i} className="px-4 py-3 whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {modalCsvData.rows.map((row, rIdx) => (
+                        <tr key={rIdx} className="hover:bg-stone-50">
+                          {row.map((cell, cIdx) => (
+                            <td key={cIdx} className="px-4 py-2.5 whitespace-nowrap">
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-stone-200 bg-stone-50 flex items-center justify-between">
+              <span className="text-xs font-mono text-stone-500 truncate max-w-md">
+                SHA-256: {visRapportModal.fil_sha256}
+              </span>
+              <div className="flex gap-2">
+                <a
+                  href={`/api/v1/rapporter/tilsyn/${visRapportModal.id}/download`}
+                  className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold shadow-sm"
+                >
+                  📥 Download CSV
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setVisRapportModal(null)}
+                  className="px-4 py-2 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-semibold cursor-pointer"
+                >
+                  Luk
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

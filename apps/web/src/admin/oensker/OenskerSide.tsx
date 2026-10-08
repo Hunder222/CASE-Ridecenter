@@ -1,21 +1,28 @@
-import type { Elevoenske } from '@ridecenter/contracts';
-import { useState, type FormEvent } from 'react';
+import type { Elevoenske, Rytter } from '@ridecenter/contracts';
+import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { forskydMaaned, maanedNavn, naesteMaaned } from '../../faelles/maaned';
 import { Badge } from '../../faelles/ui/Badge';
 import { Dialog } from '../../faelles/ui/Dialog';
 import { FejlBesked } from '../../faelles/ui/FejlBesked';
-import { Felt, Valg } from '../../faelles/ui/Felt';
+import { Felt, Input, Valg } from '../../faelles/ui/Felt';
 import { Indlaeser } from '../../faelles/ui/Indlaeser';
 import { Knap } from '../../faelles/ui/Knap';
 import { Tabel, Td, Th } from '../../faelles/ui/Tabel';
-import { useGemOensker, useHeste, useOensker } from '../api/stamdata';
+import { useGemOensker, useHeste, useOensker, useRyttere } from '../api/stamdata';
 
 interface RytterOensker {
   rytterId: string;
   navn: string;
+  niveau: Rytter['erfaringsniveau'];
   oensker: Elevoenske[];
 }
+
+const NIVEAU_LABELS: Record<Rytter['erfaringsniveau'], string> = {
+  Begynder: 'Begynder',
+  Letoevet: 'Letøvet',
+  Oevet: 'Øvet',
+};
 
 function OenskeDialog({
   maaned,
@@ -38,34 +45,63 @@ function OenskeDialog({
     );
   }
 
+  function rydAlle() {
+    if (confirm(`Er du sikker på, at du vil rydde alle ønsker for ${rytter.navn}?`)) {
+      setValgte(['', '', '']);
+      gem.mutate(
+        { rytter_id: rytter.rytterId, oensker: [] },
+        { onSuccess: onLuk },
+      );
+    }
+  }
+
+  const aktiveHeste = useMemo(() => {
+    return (heste.data ?? []).filter((h) => h.aktiv);
+  }, [heste.data]);
+
   return (
-    <Dialog aaben titel={`Ønsker for ${rytter.navn}`} onLuk={onLuk}>
-      <form onSubmit={indsend} className="space-y-3">
+    <Dialog aaben titel={`Ønsker for ${rytter.navn} (${NIVEAU_LABELS[rytter.niveau]})`} onLuk={onLuk}>
+      <form onSubmit={indsend} className="space-y-4">
+        <p className="text-sm text-stone-600">
+          Vælg op til 3 prioriterede heste for {maanedNavn(maaned)}.
+        </p>
+
         {valgte.map((valgt, i) => (
-          <Felt key={i} label={`${i + 1}. ønske`}>
+          <Felt key={i} label={`${i + 1}. prioritet`}>
             <Valg
               value={valgt}
               onChange={(e) => setValgte((v) => v.map((x, j) => (j === i ? e.target.value : x)))}
             >
-              <option value="">Intet ønske</option>
-              {(heste.data ?? [])
-                .filter((h) => h.aktiv)
-                .map((h) => (
-                  <option key={h.id} value={h.id} disabled={valgte.includes(h.id) && valgt !== h.id}>
-                    {h.navn}
-                  </option>
-                ))}
+              <option value="">— Intet ønske —</option>
+              {aktiveHeste.map((h) => (
+                <option key={h.id} value={h.id} disabled={valgte.includes(h.id) && valgt !== h.id}>
+                  {h.navn} ({h.temperament}, max {h.max_rytter_vaegt_kg} kg)
+                </option>
+              ))}
             </Valg>
           </Felt>
         ))}
+
         <FejlBesked fejl={gem.error} />
-        <div className="flex justify-end gap-2">
-          <Knap variant="sekundaer" onClick={onLuk}>
-            Annullér
-          </Knap>
-          <Knap type="submit" disabled={gem.isPending}>
-            Gem
-          </Knap>
+
+        <div className="flex items-center justify-between pt-2 border-t border-stone-200">
+          <button
+            type="button"
+            onClick={rydAlle}
+            disabled={gem.isPending || valgte.every((v) => v === '')}
+            className="text-xs text-rose-700 hover:text-rose-900 font-medium px-2 py-1 rounded hover:bg-rose-50 border border-transparent hover:border-rose-200 disabled:opacity-40 disabled:hover:bg-transparent"
+          >
+            🗑️ Ryd alle ønsker
+          </button>
+
+          <div className="flex gap-2">
+            <Knap variant="sekundaer" onClick={onLuk}>
+              Annullér
+            </Knap>
+            <Knap type="submit" disabled={gem.isPending}>
+              {gem.isPending ? 'Gemmer...' : 'Gem ønsker'}
+            </Knap>
+          </div>
         </div>
       </form>
     </Dialog>
@@ -73,73 +109,271 @@ function OenskeDialog({
 }
 
 /**
- * Ønsker for måneden (F1.1, T094). API'et har endnu ikke tilmeldinger pr. hold (Fase 2), så tabellen er pr.
- * rytter. En ridelærer kan kun gemme for ryttere på egne hold (API'et håndhæver det).
+ * Ønsker for måneden (F1.1, T094).
+ * Viser alle aktive elever med status for afgivne ønsker, så admin kan registrere, redigere eller rydde ønsker.
  */
 export function OenskerSide() {
   const { maaned = naesteMaaned() } = useParams();
   const oensker = useOensker(maaned);
+  const ryttere = useRyttere();
   const heste = useHeste();
+  const gemOensker = useGemOensker(maaned);
+
   const [redigerer, setRedigerer] = useState<RytterOensker | null>(null);
-  const hesteNavne = new Map((heste.data ?? []).map((h) => [h.id, h.navn]));
-  const prRytter = new Map<string, RytterOensker>();
-  for (const o of oensker.data ?? []) {
-    const r = prRytter.get(o.rytter_id) ?? { rytterId: o.rytter_id, navn: o.rytter_navn, oensker: [] };
-    r.oensker.push(o);
-    prRytter.set(o.rytter_id, r);
-  }
+  const [filter, setFilter] = useState<'alle' | 'mangler' | 'har'>('alle');
+  const [soegning, setSoegning] = useState('');
+
+  const hesteNavne = useMemo(
+    () => new Map((heste.data ?? []).map((h) => [h.id, h.navn])),
+    [heste.data],
+  );
+
+  // Kombiner alle aktive ryttere med deres ønsker for den valgte måned
+  const alleRytterOensker = useMemo(() => {
+    const oenskerMap = new Map<string, Elevoenske[]>();
+    for (const o of oensker.data ?? []) {
+      const eksisterende = oenskerMap.get(o.rytter_id) ?? [];
+      eksisterende.push(o);
+      oenskerMap.set(o.rytter_id, eksisterende);
+    }
+
+    const aktiveRyttere = (ryttere.data ?? []).filter((r) => r.aktiv_status === 'Aktiv');
+
+    return aktiveRyttere.map((r): RytterOensker => ({
+      rytterId: r.id,
+      navn: `${r.fornavn} ${r.efternavn}`,
+      niveau: r.erfaringsniveau,
+      oensker: oenskerMap.get(r.id) ?? [],
+    }));
+  }, [ryttere.data, oensker.data]);
+
+  // Filtrering og søgning
+  const filtreredeRyttere = useMemo(() => {
+    return alleRytterOensker.filter((r) => {
+      const matcherSoegning = r.navn.toLowerCase().includes(soegning.trim().toLowerCase());
+      if (!matcherSoegning) return false;
+
+      if (filter === 'mangler') return r.oensker.length === 0;
+      if (filter === 'har') return r.oensker.length > 0;
+      return true;
+    });
+  }, [alleRytterOensker, filter, soegning]);
+
+  const antalMangler = alleRytterOensker.filter((r) => r.oensker.length === 0).length;
+  const antalHar = alleRytterOensker.filter((r) => r.oensker.length > 0).length;
+
+  const haandterHurtigRyd = (r: RytterOensker) => {
+    if (confirm(`Er du sikker på, at du vil rydde alle ønsker for ${r.navn}?`)) {
+      gemOensker.mutate({ rytter_id: r.rytterId, oensker: [] });
+    }
+  };
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">Ønsker – {maanedNavn(maaned)}</h1>
-        <Link to={`/admin/oensker/${forskydMaaned(maaned, -1)}`} className="text-emerald-800 underline">
-          ← Forrige måned
-        </Link>
-        <Link to={`/admin/oensker/${forskydMaaned(maaned, 1)}`} className="text-emerald-800 underline">
-          Næste måned →
-        </Link>
+    <section className="space-y-6">
+      {/* Header og månedsnavigator */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-stone-200">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-stone-900">Elevønsker – {maanedNavn(maaned)}</h1>
+          <p className="text-sm text-stone-600 mt-1">
+            Indtast eller redigér elevernes hesteønsker forud for månedsfordelingen.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Link
+            to={`/admin/oensker/${forskydMaaned(maaned, -1)}`}
+            className="px-3 py-1.5 rounded-lg border border-stone-300 bg-white hover:bg-stone-50 text-stone-700 shadow-sm transition"
+          >
+            ← Forrige måned
+          </Link>
+          <Link
+            to={`/admin/oensker/${forskydMaaned(maaned, 1)}`}
+            className="px-3 py-1.5 rounded-lg border border-stone-300 bg-white hover:bg-stone-50 text-stone-700 shadow-sm transition"
+          >
+            Næste måned →
+          </Link>
+        </div>
       </div>
-      <FejlBesked fejl={oensker.error} />
-      {oensker.isPending && <Indlaeser />}
-      {oensker.data && prRytter.size === 0 && <p>Der er ingen ønsker for måneden endnu.</p>}
-      {prRytter.size > 0 && (
+
+      <FejlBesked fejl={oensker.error ?? ryttere.error} />
+
+      {/* Filterknapper og søgefelt */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFilter('alle')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+              filter === 'alle'
+                ? 'bg-stone-800 text-white border-stone-800'
+                : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+            }`}
+          >
+            Alle ({alleRytterOensker.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('mangler')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+              filter === 'mangler'
+                ? 'bg-amber-600 text-white border-amber-600'
+                : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+            }`}
+          >
+            Mangler ønsker ({antalMangler})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilter('har')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+              filter === 'har'
+                ? 'bg-emerald-700 text-white border-emerald-700'
+                : 'bg-white text-stone-700 border-stone-300 hover:bg-stone-50'
+            }`}
+          >
+            Har afgivet ønsker ({antalHar})
+          </button>
+        </div>
+
+        <div className="w-full sm:w-64">
+          <Input
+            type="search"
+            placeholder="Søg elev..."
+            value={soegning}
+            onChange={(e) => setSoegning(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {(oensker.isPending || ryttere.isPending) && <Indlaeser />}
+
+      {!oensker.isPending && !ryttere.isPending && (
         <Tabel>
           <thead>
             <tr>
-              <Th>Rytter</Th>
-              <Th>1. ønske</Th>
-              <Th>2. ønske</Th>
-              <Th>3. ønske</Th>
-              <Th>
-                <span className="sr-only">Handling</span>
-              </Th>
+              <Th>Elev</Th>
+              <Th>Niveau</Th>
+              <Th>Status</Th>
+              <Th>1. prioritet</Th>
+              <Th>2. prioritet</Th>
+              <Th>3. prioritet</Th>
+              <Th className="text-right">Handling</Th>
             </tr>
           </thead>
           <tbody>
-            {[...prRytter.values()].map((r) => (
-              <tr key={r.rytterId}>
-                <Td className="font-medium">{r.navn}</Td>
-                {[1, 2, 3].map((prioritet) => {
-                  const oenske = r.oensker.find((o) => o.prioritet === prioritet);
-                  return (
-                    <Td key={prioritet}>
-                      {oenske ? (hesteNavne.get(oenske.oensket_hest_id) ?? 'Ukendt hest') : '—'}{' '}
-                      {oenske && !oenske.kan_opfyldes && <Badge variant="advarsel">Kan ikke opfyldes</Badge>}
-                    </Td>
-                  );
-                })}
-                <Td>
-                  <Knap variant="sekundaer" onClick={() => setRedigerer(r)}>
-                    Redigér
-                  </Knap>
+            {filtreredeRyttere.length === 0 ? (
+              <tr>
+                <Td colSpan={7} className="text-center py-8 text-stone-500">
+                  Ingen elever matcher søgningen eller filteret.
                 </Td>
               </tr>
-            ))}
+            ) : (
+              filtreredeRyttere.map((r) => {
+                const oenske1 = r.oensker.find((o) => o.prioritet === 1);
+                const oenske2 = r.oensker.find((o) => o.prioritet === 2);
+                const oenske3 = r.oensker.find((o) => o.prioritet === 3);
+
+                return (
+                  <tr key={r.rytterId} className="hover:bg-stone-50 transition">
+                    <Td className="font-semibold text-stone-900">{r.navn}</Td>
+                    <Td>
+                      <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-stone-100 text-stone-700 border border-stone-200">
+                        {NIVEAU_LABELS[r.niveau]}
+                      </span>
+                    </Td>
+                    <Td>
+                      {r.oensker.length === 3 ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          ● 3/3 ønsker
+                        </span>
+                      ) : r.oensker.length > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                          {r.oensker.length}/3 delvis
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                          Mangler
+                        </span>
+                      )}
+                    </Td>
+                    <Td>
+                      {oenske1 ? (
+                        <span className="font-medium text-stone-800">
+                          {hesteNavne.get(oenske1.oensket_hest_id) ?? 'Ukendt hest'}
+                          {!oenske1.kan_opfyldes && (
+                            <Badge variant="advarsel">
+                              Kan ikke opfyldes
+                            </Badge>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-stone-400">—</span>
+                      )}
+                    </Td>
+                    <Td>
+                      {oenske2 ? (
+                        <span className="font-medium text-stone-800">
+                          {hesteNavne.get(oenske2.oensket_hest_id) ?? 'Ukendt hest'}
+                          {!oenske2.kan_opfyldes && (
+                            <Badge variant="advarsel">
+                              Kan ikke opfyldes
+                            </Badge>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-stone-400">—</span>
+                      )}
+                    </Td>
+                    <Td>
+                      {oenske3 ? (
+                        <span className="font-medium text-stone-800">
+                          {hesteNavne.get(oenske3.oensket_hest_id) ?? 'Ukendt hest'}
+                          {!oenske3.kan_opfyldes && (
+                            <Badge variant="advarsel">
+                              Kan ikke opfyldes
+                            </Badge>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-stone-400">—</span>
+                      )}
+                    </Td>
+                    <Td className="text-right whitespace-nowrap">
+                      <div className="inline-flex items-center gap-1.5">
+                        <Knap
+                          variant="sekundaer"
+                          onClick={() => setRedigerer(r)}
+                          className="text-xs py-1 px-2.5"
+                        >
+                          {r.oensker.length > 0 ? 'Redigér' : '+ Indtast'}
+                        </Knap>
+                        {r.oensker.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => haandterHurtigRyd(r)}
+                            title="Ryd ønsker"
+                            aria-label="Ryd ønsker"
+                            className="p-1.5 rounded hover:bg-rose-50 text-rose-600 hover:text-rose-800 border border-transparent hover:border-rose-200 transition text-xs cursor-pointer"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                    </Td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </Tabel>
       )}
-      {redigerer && <OenskeDialog maaned={maaned} rytter={redigerer} onLuk={() => setRedigerer(null)} />}
+
+      {redigerer && (
+        <OenskeDialog
+          maaned={maaned}
+          rytter={redigerer}
+          onLuk={() => setRedigerer(null)}
+        />
+      )}
     </section>
   );
 }

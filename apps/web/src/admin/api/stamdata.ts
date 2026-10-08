@@ -6,6 +6,7 @@ import type {
   Hold,
   OenskerPut,
   Rytter,
+  RytterInput,
   RytterOpdatering,
   Sikkerhedsprofil,
   SikkerhedsprofilInput,
@@ -115,6 +116,23 @@ export function useOpdaterRytter() {
   return useMutation({
     mutationFn: ({ id, aendring }: { id: string; aendring: RytterOpdatering }) =>
       api<Rytter>(`/ryttere/${id}`, { metode: 'PATCH', body: aendring }),
+    onSuccess: () => queryKlient.invalidateQueries({ queryKey: stamdataNoegler.ryttere }),
+  });
+}
+
+export function useOpretRytter() {
+  const queryKlient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RytterInput) => api<Rytter>('/ryttere', { metode: 'POST', body: input }),
+    onSuccess: () => queryKlient.invalidateQueries({ queryKey: stamdataNoegler.ryttere }),
+  });
+}
+
+export function useSletRytter() {
+  const queryKlient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api<{ ok: boolean; status: string }>(`/ryttere/${id}`, { metode: 'DELETE' }),
     onSuccess: () => queryKlient.invalidateQueries({ queryKey: stamdataNoegler.ryttere }),
   });
 }

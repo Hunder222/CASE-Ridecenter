@@ -5,6 +5,7 @@ import {
   Maaned,
   ManuelJustering,
   PubliceringSvar,
+  SaertildelSvar,
   Tildelingskoersel,
   Uuid,
 } from '@ridecenter/contracts';
@@ -12,7 +13,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { IdParams } from '../../faelles';
 import { aktuelBruger, kraevRoller } from '../../plugins/rbac';
-import { justerTildeling, kandidater } from './justering-service';
+import { justerTildeling, kandidater, saertildelAlle } from './justering-service';
 import { hentKoersel, koerTildeling, listKoersler } from './koersel-service';
 import { godkendKoersel, publicerKoersel } from './publicering-service';
 
@@ -35,7 +36,13 @@ export const tildelingsRuter: FastifyPluginAsyncZod = async (app) => {
     '/tildeling/koersler',
     { onRequest: begge, schema: { body: KoerselStart, response: { 201: Tildelingskoersel } } },
     async (request, reply) => {
-      const id = await koerTildeling(app, request.body.maaned, aktuelBruger(request));
+      const id = await koerTildeling(
+        app,
+        request.body.maaned,
+        aktuelBruger(request),
+        request.body.reserver_begynder_heste,
+        request.body.reserver_spring_heste,
+      );
       return reply.status(201).send(await hentKoersel(app.prisma, id));
     },
   );
@@ -65,7 +72,14 @@ export const tildelingsRuter: FastifyPluginAsyncZod = async (app) => {
         request.params.tildelingId,
         request.body.hest_id,
         aktuelBruger(request),
+        request.body.tillad_niveau_dispensation,
       ),
+  );
+
+  app.post(
+    '/tildeling/koersler/:id/saertildel-alle',
+    { onRequest: begge, schema: { params: IdParams, response: { 200: SaertildelSvar } } },
+    async (request) => saertildelAlle(app, request.params.id, aktuelBruger(request)),
   );
 
   app.post(

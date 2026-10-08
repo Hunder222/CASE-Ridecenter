@@ -117,8 +117,11 @@ export const LaasSide: React.FC = () => {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 select-none">
       <div className="w-full max-w-sm flex flex-col items-center">
         {/* Logo & Titel */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Bøgegården Stald</h1>
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <span className="text-2xl" role="img" aria-label="Hest">🐎</span>
+            <h1 className="text-3xl font-bold tracking-tight text-white">Bøgegården Stald</h1>
+          </div>
           <p className="text-slate-400 text-sm">Indtast 4-cifret PIN for at låse op</p>
         </div>
 
