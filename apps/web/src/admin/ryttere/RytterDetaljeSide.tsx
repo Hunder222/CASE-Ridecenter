@@ -118,7 +118,44 @@ function RytterFormular({ rytter }: { rytter: Rytter }) {
         checked={data.er_hjaelper}
         onChange={(e) => saet('er_hjaelper', e.target.checked)}
       />
-      <Felt label="Parthest">
+      <div className="col-span-2 rounded-xl border border-stone-200 bg-stone-50 p-4 space-y-3">
+        <div>
+          <span className="text-xs font-bold uppercase tracking-wider text-stone-600 block">
+            Aktive partaftaler & påkrævede heste
+          </span>
+          <span className="text-xs text-stone-500">
+            En elev kan have flere partsheste (f.eks. påkrævede heste fra sikkerhedsprofilen).
+          </span>
+        </div>
+        {rytter.partaftale_hest_ids && rytter.partaftale_hest_ids.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {rytter.partaftale_hest_ids.map((hid) => {
+              const hest = heste.data?.find((h) => h.id === hid);
+              const erPaakraevet = (rytter.paakraevede_hest_ids ?? []).includes(hid) || rytter.har_paakraevet_hest;
+              return (
+                <span
+                  key={hid}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300"
+                >
+                  <span>🐎 {hest?.navn ?? 'Parthest'}</span>
+                  {erPaakraevet && (
+                    <span
+                      title="Påkrævet hest af hensyn til rytterens sikkerhedsprofil (partaftale)"
+                      className="cursor-help text-amber-700 text-sm font-bold inline-flex items-center leading-none"
+                    >
+                      🔒
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-stone-500 italic">Ingen aktive partaftaler eller påkrævede heste.</p>
+        )}
+      </div>
+
+      <Felt label="Primær parthest (eller tilføj part)">
         <Valg
           value={data.partaftale_hest_id ?? ''}
           onChange={(e) => saet('partaftale_hest_id', e.target.value === '' ? null : e.target.value)}

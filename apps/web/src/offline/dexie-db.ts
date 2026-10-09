@@ -38,6 +38,8 @@ export interface LokalPlads {
   godkendteHeste?: string[];
   cheatSheetKoder?: string[];
   adfaerdsinstruks?: string | null;
+  har_partaftale?: boolean;
+  partaftale_hest_id?: string | null;
 }
 
 export interface LokalHest {

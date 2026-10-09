@@ -37,13 +37,29 @@ export class StatusService {
     const brugerNavn = bruger?.navn ?? 'Stald-bruger';
 
     return this.prisma.$transaction(async (tx) => {
-      // Opret post i append-only hestestatusmelding 🧾
+      // Map alvorlighed til DB enum (Info, Obs, KanIkkeBruges)
+      const dbAlvorlighed =
+        input.alvorlighed === 'Raskmeldt'
+          ? 'Info'
+          : ['Sygemeldt', 'Skadet', 'Karantaene', 'KanIkkeBruges'].includes(input.alvorlighed)
+          ? 'KanIkkeBruges'
+          : input.alvorlighed;
+
+      const dbBeskrivelse =
+        input.alvorlighed === 'Raskmeldt' && !input.beskrivelse.toLowerCase().includes('rask')
+          ? `[Raskmeldt] ${input.beskrivelse}`
+          : input.alvorlighed === 'Skadet' && !input.beskrivelse.toLowerCase().includes('skad')
+          ? `[Skadet] ${input.beskrivelse}`
+          : input.alvorlighed === 'Karantaene' && !input.beskrivelse.toLowerCase().includes('karant')
+          ? `[Karantæne] ${input.beskrivelse}`
+          : input.beskrivelse;
+
       const melding = await tx.hestestatusmelding.create({
         data: {
           hest_id: hestId,
           type: input.type,
-          alvorlighed: input.alvorlighed,
-          beskrivelse: input.beskrivelse,
+          alvorlighed: dbAlvorlighed as any,
+          beskrivelse: dbBeskrivelse,
           meldt_af_bruger_id: bruger?.id ?? null,
           meldt_af_navn: brugerNavn,
           klient_tidspunkt: tidspunktKlient,
@@ -52,27 +68,46 @@ export class StatusService {
         },
       });
 
-      // Fail-safe: Ved KanIkkeBruges sættes hesten straks til Sygemeldt
-      if (input.alvorlighed === 'KanIkkeBruges') {
+      // Opdater hestens sundhedsstatus i henhold til meldingen
+      let nySundhedsstatus = hest.sundhedsstatus;
+      if (input.alvorlighed === 'KanIkkeBruges' || input.alvorlighed === 'Sygemeldt') {
+        nySundhedsstatus = 'Sygemeldt';
+      } else if (input.alvorlighed === 'Skadet') {
+        nySundhedsstatus = 'Skadet';
+      } else if (input.alvorlighed === 'Karantaene') {
+        nySundhedsstatus = 'Karantaene';
+      } else if (input.alvorlighed === 'Raskmeldt') {
+        nySundhedsstatus = 'Aktiv';
+      }
+
+      if (nySundhedsstatus !== hest.sundhedsstatus) {
         await tx.hest.update({
           where: { id: hestId },
-          data: { sundhedsstatus: 'Sygemeldt' },
+          data: { sundhedsstatus: nySundhedsstatus as any },
         });
 
-        // Opret dashboard-notifikation HEST_UDE_AF_DRIFT
-        await tx.dashboardNotifikation.create({
-          data: {
-            type: 'HEST_UDE_AF_DRIFT',
-            payload: {
-              hest_id: hestId,
-              hest_navn: hest.navn,
-              alvorlighed: input.alvorlighed,
-              beskrivelse: input.beskrivelse,
-              meldt_af: brugerNavn,
+        if (nySundhedsstatus === 'Aktiv') {
+          // Fjern eventuel aktiv HEST_UDE_AF_DRIFT notifikation
+          await tx.dashboardNotifikation.deleteMany({
+            where: { dedupe_noegle: `HEST_UDE_AF_DRIFT:${hestId}` },
+          });
+        } else {
+          // Opret dashboard-notifikation HEST_UDE_AF_DRIFT
+          await tx.dashboardNotifikation.create({
+            data: {
+              type: 'HEST_UDE_AF_DRIFT',
+              payload: {
+                hest_id: hestId,
+                hest_navn: hest.navn,
+                alvorlighed: input.alvorlighed,
+                sundhedsstatus: nySundhedsstatus,
+                beskrivelse: input.beskrivelse,
+                meldt_af: brugerNavn,
+              },
+              dedupe_noegle: `HEST_UDE_AF_DRIFT:${hestId}`,
             },
-            dedupe_noegle: `HEST_UDE_AF_DRIFT:${hestId}`,
-          },
-        });
+          });
+        }
       }
 
       await logHaendelse(tx, {
@@ -83,7 +118,7 @@ export class StatusService {
         tidspunkt: nu,
         foer: { sundhedsstatus: hest.sundhedsstatus },
         efter: {
-          sundhedsstatus: input.alvorlighed === 'KanIkkeBruges' ? 'Sygemeldt' : hest.sundhedsstatus,
+          sundhedsstatus: nySundhedsstatus,
           melding: input,
         },
       });
@@ -91,7 +126,7 @@ export class StatusService {
       // Udsend SSE
       this.app.sse?.udsendEvent('hest.status', {
         hest_id: hestId,
-        sundhedsstatus: input.alvorlighed === 'KanIkkeBruges' ? 'Sygemeldt' : hest.sundhedsstatus,
+        sundhedsstatus: nySundhedsstatus,
         melding: input,
       });
 

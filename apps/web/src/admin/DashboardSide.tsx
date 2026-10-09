@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
 import type { DashboardNoegletalSvar, HestBelastningCelle } from '@ridecenter/contracts';
 import { maanedNavn } from '../faelles/maaned';
 
 export const DashboardSide: React.FC = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardNoegletalSvar | null>(null);
   const [valgtMaaned, setValgtMaaned] = useState<string>('2026-10');
   const [indlaeser, setIndlaeser] = useState(true);
@@ -140,54 +142,236 @@ export const DashboardSide: React.FC = () => {
         </div>
       )}
 
-      {/* KPI KORT (4 nøgletal) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl bg-white border border-stone-200 p-5 shadow-sm">
-          <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">
-            Holdudnyttelse
-          </span>
-          <div className="text-3xl font-extrabold text-stone-900 mt-1">
-            {data?.ugentlig_holdudnyttelse_procent ?? 0}%
-          </div>
-          <span className="text-xs text-stone-400 mt-1 block">Tilmeldte vs. max kapacitet</span>
+      {/* KAPACITETSUDNYTTELSE (4 nøgletal) */}
+      <div className="space-y-2">
+        <div className="text-xs font-bold uppercase tracking-wider text-stone-500">
+          Kapacitetsudnyttelse
         </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Samlet holdudnyttelse */}
+          <div className="rounded-2xl bg-white border border-stone-200 p-5 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-stone-600 uppercase tracking-wider">
+                  Holdudnyttelse (samlet)
+                </span>
+                {data?.samlet_holdudnyttelse_detaljer?.er_over_holddag_max && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white">
+                    &gt;100% holddag
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span
+                  className={`text-3xl font-extrabold ${
+                    data?.samlet_holdudnyttelse_detaljer?.er_over_holddag_max
+                      ? 'text-rose-600'
+                      : 'text-stone-900'
+                  }`}
+                >
+                  {data?.samlet_holdudnyttelse_detaljer?.effektiv_udnyttelse_procent ??
+                    data?.ugentlig_holdudnyttelse_procent ??
+                    0}
+                  %
+                </span>
+                <span className="text-[11px] text-stone-500 font-medium">
+                  inkl. planlagte hestehviledage
+                </span>
+              </div>
+              <span className="text-xs text-stone-500 mt-2 block">
+                {data?.samlet_holdudnyttelse_detaljer
+                  ? `${data.samlet_holdudnyttelse_detaljer.tilmeldte} elever / ${data.samlet_holdudnyttelse_detaljer.kapacitet} pladser (${data.samlet_holdudnyttelse_detaljer.ugebasis_procent}% ugebasis)`
+                  : 'Tilmeldte vs. max kapacitet'}
+              </span>
+            </div>
+          </div>
 
-        <div className="rounded-2xl bg-white border border-stone-200 p-5 shadow-sm">
-          <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">
-            Heste ude af drift
-          </span>
+          {/* Begynder-heste */}
+          <div className="rounded-2xl bg-white border border-stone-200 p-5 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">
+                  Begynder-heste
+                </span>
+                {data?.begynder_heste_detaljer?.er_over_holddag_max && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white">
+                    &gt;100% holddag
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span
+                  className={`text-3xl font-extrabold ${
+                    data?.begynder_heste_detaljer?.er_over_holddag_max
+                      ? 'text-rose-600'
+                      : 'text-emerald-700'
+                  }`}
+                >
+                  {data?.begynder_heste_detaljer?.effektiv_udnyttelse_procent ??
+                    data?.begynder_heste_udnyttelse_procent ??
+                    0}
+                  %
+                </span>
+                <span className="text-[11px] text-stone-500 font-medium">
+                  inkl. planlagte hestehviledage
+                </span>
+              </div>
+              <span className="text-xs text-stone-500 mt-2 block">
+                {data?.begynder_heste_detaljer
+                  ? `${data.begynder_heste_detaljer.tilmeldte} elever / ${data.begynder_heste_detaljer.kapacitet} pladser (${data.begynder_heste_detaljer.ugebasis_procent}% ugebasis)`
+                  : 'Begynder & trækhold'}
+              </span>
+            </div>
+          </div>
+
+          {/* Øvet-heste */}
+          <div className="rounded-2xl bg-white border border-stone-200 p-5 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-sky-800 uppercase tracking-wider">
+                  Øvet-heste
+                </span>
+                {data?.oevet_heste_detaljer?.er_over_holddag_max && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white">
+                    &gt;100% holddag
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span
+                  className={`text-3xl font-extrabold ${
+                    data?.oevet_heste_detaljer?.er_over_holddag_max
+                      ? 'text-rose-600'
+                      : 'text-sky-700'
+                  }`}
+                >
+                  {data?.oevet_heste_detaljer?.effektiv_udnyttelse_procent ??
+                    data?.oevet_heste_udnyttelse_procent ??
+                    0}
+                  %
+                </span>
+                <span className="text-[11px] text-stone-500 font-medium">
+                  inkl. planlagte hestehviledage
+                </span>
+              </div>
+              <span className="text-xs text-stone-500 mt-2 block">
+                {data?.oevet_heste_detaljer
+                  ? `${data.oevet_heste_detaljer.tilmeldte} elever / ${data.oevet_heste_detaljer.kapacitet} pladser (${data.oevet_heste_detaljer.ugebasis_procent}% ugebasis)`
+                  : 'Øvet & letøvet hold'}
+              </span>
+            </div>
+          </div>
+
+          {/* Spring-heste */}
+          <div className="rounded-2xl bg-white border border-stone-200 p-5 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-rose-800 uppercase tracking-wider">
+                  Spring-heste
+                </span>
+                {data?.spring_heste_detaljer?.er_over_holddag_max && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white">
+                    &gt;100% holddag
+                  </span>
+                )}
+              </div>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span
+                  className={`text-3xl font-extrabold ${
+                    data?.spring_heste_detaljer?.er_over_holddag_max
+                      ? 'text-rose-600'
+                      : 'text-stone-900'
+                  }`}
+                >
+                  {data?.spring_heste_detaljer?.effektiv_udnyttelse_procent ??
+                    data?.spring_heste_udnyttelse_procent ??
+                    0}
+                  %
+                </span>
+                <span className="text-[11px] text-stone-500 font-medium">
+                  inkl. planlagte hestehviledage
+                </span>
+              </div>
+              <span className="text-xs text-stone-500 mt-2 block">
+                {data?.spring_heste_detaljer
+                  ? `${data.spring_heste_detaljer.tilmeldte} elever / ${data.spring_heste_detaljer.kapacitet} springheste (${data.spring_heste_detaljer.ugebasis_procent}% ugebasis)`
+                  : 'Springhold (HC-05)'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* DRIFTS-STATUS */}
+      <div className="space-y-2">
+        <div className="text-xs font-bold uppercase tracking-wider text-stone-500">
+          Driftsstatus & bemanding
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div
-            className={`text-3xl font-extrabold mt-1 ${
-              (data?.antal_heste_ude_af_drift ?? 0) > 0 ? 'text-amber-600' : 'text-stone-900'
-            }`}
+            onClick={() => navigate('/admin/heste')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && navigate('/admin/heste')}
+            className="rounded-2xl bg-white border border-stone-200 p-5 shadow-sm hover:border-stone-400 hover:shadow-md transition cursor-pointer group"
           >
-            {data?.antal_heste_ude_af_drift ?? 0}
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider group-hover:text-stone-800 transition">
+                Heste ude af drift
+              </span>
+              <span className="text-xs text-stone-400 group-hover:text-stone-700 transition">→</span>
+            </div>
+            <div
+              className={`text-3xl font-extrabold mt-1 ${
+                (data?.antal_heste_ude_af_drift ?? 0) > 0 ? 'text-amber-600' : 'text-stone-900'
+              }`}
+            >
+              {data?.antal_heste_ude_af_drift ?? 0}
+            </div>
+            <span className="text-xs text-stone-400 mt-1 block">Sygemeldt, skadet el. karantæne</span>
           </div>
-          <span className="text-xs text-stone-400 mt-1 block">Sygemeldt, skadet el. karantæne</span>
-        </div>
 
-        <div className="rounded-2xl bg-white border border-stone-200 p-5 shadow-sm">
-          <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">
-            Ventelisteforslag
-          </span>
           <div
-            className={`text-3xl font-extrabold mt-1 ${
-              (data?.afventende_ventelisteforslag ?? 0) > 0 ? 'text-sky-600' : 'text-stone-900'
-            }`}
+            onClick={() => navigate('/admin/venteliste')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && navigate('/admin/venteliste')}
+            className="rounded-2xl bg-white border border-stone-200 p-5 shadow-sm hover:border-stone-400 hover:shadow-md transition cursor-pointer group"
           >
-            {data?.afventende_ventelisteforslag ?? 0}
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider group-hover:text-stone-800 transition">
+                Ventelisteforslag
+              </span>
+              <span className="text-xs text-stone-400 group-hover:text-stone-700 transition">→</span>
+            </div>
+            <div
+              className={`text-3xl font-extrabold mt-1 ${
+                (data?.afventende_ventelisteforslag ?? 0) > 0 ? 'text-sky-600' : 'text-stone-900'
+              }`}
+            >
+              {data?.afventende_ventelisteforslag ?? 0}
+            </div>
+            <span className="text-xs text-stone-400 mt-1 block">Afventer manuel godkendelse</span>
           </div>
-          <span className="text-xs text-stone-400 mt-1 block">Afventer manuel godkendelse</span>
-        </div>
 
-        <div className="rounded-2xl bg-white border border-stone-200 p-5 shadow-sm">
-          <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">
-            Aktive vikarkoder
-          </span>
-          <div className="text-3xl font-extrabold text-stone-900 mt-1">
-            {data?.aktive_vikarkoder ?? 0}
+          <div
+            onClick={() => navigate('/admin/vikarkoder')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && navigate('/admin/vikarkoder')}
+            className="rounded-2xl bg-white border border-stone-200 p-5 shadow-sm hover:border-stone-400 hover:shadow-md transition cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider group-hover:text-stone-800 transition">
+                Aktive vikarkoder
+              </span>
+              <span className="text-xs text-stone-400 group-hover:text-stone-700 transition">→</span>
+            </div>
+            <div className="text-3xl font-extrabold text-stone-900 mt-1">
+              {data?.aktive_vikarkoder ?? 0}
+            </div>
+            <span className="text-xs text-stone-400 mt-1 block">Gyldige 5-cifrede engangskoder</span>
           </div>
-          <span className="text-xs text-stone-400 mt-1 block">Gyldige 6-cifrede engangskoder</span>
         </div>
       </div>
 

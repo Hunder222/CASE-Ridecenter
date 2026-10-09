@@ -152,7 +152,10 @@ export function useGemSikkerhedsprofil(rytterId: string) {
   return useMutation({
     mutationFn: (profil: SikkerhedsprofilInput) =>
       api<Sikkerhedsprofil>(`/ryttere/${rytterId}/sikkerhedsprofil`, { metode: 'PUT', body: profil }),
-    onSuccess: (profil) => queryKlient.setQueryData(stamdataNoegler.sikkerhedsprofil(rytterId), profil),
+    onSuccess: (profil) => {
+      queryKlient.setQueryData(stamdataNoegler.sikkerhedsprofil(rytterId), profil);
+      void queryKlient.invalidateQueries({ queryKey: stamdataNoegler.ryttere });
+    },
   });
 }
 

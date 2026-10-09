@@ -307,7 +307,7 @@ export const VikarKoderSide: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-stone-900">Vikar-adgang & Koder</h1>
           <p className="text-sm text-stone-600 mt-1">
-            Udsted 6-cifrede koder til akutte eller faste vikarer. Faste vikarer kan genbruge deres kode uden automatisk låsning.
+            Udsted 5-cifrede koder til akutte eller faste vikarer. Faste vikarer kan genbruge deres kode uden automatisk låsning.
           </p>
         </div>
         <button
@@ -808,7 +808,7 @@ export const VikarKoderSide: React.FC = () => {
                               🖨️ Bon
                             </button>
                           )}
-                          {k.status === 'Aktiv' && (
+                          {(k.status === 'Aktiv' || k.status === 'Anvendt') && (
                             <button
                               type="button"
                               onClick={() => haandterSpaerKode(k.id)}
@@ -888,7 +888,7 @@ export const VikarKoderSide: React.FC = () => {
               ? `Vælg "${printSeddelData.navn}" på listen over registrerede vikarer.`
               : 'Indtast dit navn på skærmen.'}
           </p>
-          <p>3. Indtast den 6-cifrede pinkode for at låse staldvisningen op.</p>
+          <p>3. Indtast den 5-cifrede pinkode for at låse staldvisningen op.</p>
           <p className="text-[10px] text-stone-500 pt-2 border-t border-stone-200">
             Kodetype: {printSeddelData?.fast_vikar ? 'Fast vikar (genanvendelig)' : 'Engangskode (låser efter brug)'}
             {printSeddelData?.udloebsdato ? ` • Udløber: ${printSeddelData.udloebsdato}` : ''}

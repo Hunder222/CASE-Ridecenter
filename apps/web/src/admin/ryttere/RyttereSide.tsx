@@ -38,7 +38,7 @@ export function RyttereSide() {
 
   const [soegning, setSoegning] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Alle' | 'Aktiv' | 'Opsagt'>('Alle');
-  const [sorteringsFelt, setSorteringsFelt] = useState<'navn' | 'niveau' | 'hoejde' | 'part' | 'status'>('navn');
+  const [sorteringsFelt, setSorteringsFelt] = useState<'navn' | 'niveau' | 'hold' | 'hoejde' | 'part' | 'status'>('navn');
   const [sorteringsRetning, setSorteringsRetning] = useState<'asc' | 'desc'>('asc');
   const [visOpretModal, setVisOpretModal] = useState(false);
   const [nytInput, setNytInput] = useState<RytterInput>(TOM_RYTTER);
@@ -47,7 +47,7 @@ export function RyttereSide() {
 
   const hesteNavne = new Map((heste.data ?? []).map((h) => [h.id, h.navn]));
 
-  const skiftSortering = (felt: 'navn' | 'niveau' | 'hoejde' | 'part' | 'status') => {
+  const skiftSortering = (felt: 'navn' | 'niveau' | 'hold' | 'hoejde' | 'part' | 'status') => {
     if (sorteringsFelt === felt) {
       setSorteringsRetning(sorteringsRetning === 'asc' ? 'desc' : 'asc');
     } else {
@@ -76,6 +76,10 @@ export function RyttereSide() {
       } else if (sorteringsFelt === 'niveau') {
         const niveauer: Record<string, number> = { Begynder: 1, Letoevet: 2, Oevet: 3 };
         cmp = (niveauer[a.erfaringsniveau] ?? 0) - (niveauer[b.erfaringsniveau] ?? 0);
+      } else if (sorteringsFelt === 'hold') {
+        const holdA = (a.hold_navne ?? []).join(', ');
+        const holdB = (b.hold_navne ?? []).join(', ');
+        cmp = holdA.localeCompare(holdB, 'da');
       } else if (sorteringsFelt === 'hoejde') {
         cmp = a.hoejde_cm - b.hoejde_cm;
       } else if (sorteringsFelt === 'part') {
@@ -202,6 +206,16 @@ export function RyttereSide() {
               <Th>
                 <button
                   type="button"
+                  onClick={() => skiftSortering('hold')}
+                  className="flex items-center gap-1 hover:text-stone-900 cursor-pointer font-bold"
+                >
+                  <span>Tilmeldte hold</span>
+                  {sorteringsFelt === 'hold' && <span>{sorteringsRetning === 'asc' ? '▲' : '▼'}</span>}
+                </button>
+              </Th>
+              <Th>
+                <button
+                  type="button"
                   onClick={() => skiftSortering('hoejde')}
                   className="flex items-center gap-1 hover:text-stone-900 cursor-pointer font-bold"
                 >
@@ -235,7 +249,7 @@ export function RyttereSide() {
           <tbody>
             {viste.length === 0 ? (
               <tr>
-                <Td colSpan={6} className="text-center py-8 text-stone-500 text-sm">
+                <Td colSpan={7} className="text-center py-8 text-stone-500 text-sm">
                   Ingen ryttere fundet med de valgte kriterier.
                 </Td>
               </tr>
@@ -255,14 +269,66 @@ export function RyttereSide() {
                       {NIVEAU[r.erfaringsniveau]}
                     </span>
                   </Td>
+                  <Td>
+                    {r.hold_navne && r.hold_navne.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {r.hold_navne.map((navn) => (
+                          <span
+                            key={navn}
+                            className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-stone-100 text-stone-700 border border-stone-200"
+                          >
+                            {navn}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-stone-400 text-xs italic">Ingen hold</span>
+                    )}
+                  </Td>
                   <Td className="text-xs text-stone-600 font-mono">
                     {r.hoejde_cm} cm / {r.vaegt_kg} kg
                   </Td>
                   <Td>
-                    {r.partaftale_hest_id ? (
-                      <span className="text-xs font-medium text-emerald-800">
-                        🐎 {hesteNavne.get(r.partaftale_hest_id) ?? 'Parthest'}
+                    {r.partaftale_hest_ids && r.partaftale_hest_ids.length > 0 ? (
+                      <div className="flex flex-col gap-1">
+                        {r.partaftale_hest_ids.map((hid) => {
+                          const hestNavn = hesteNavne.get(hid) ?? 'Parthest';
+                          const erPaakraevet = (r.paakraevede_hest_ids ?? []).includes(hid) || r.har_paakraevet_hest;
+                          return (
+                            <span key={hid} className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-800">
+                              <span>🐎 {hestNavn}</span>
+                              {erPaakraevet && (
+                                <span
+                                  title="Påkrævet hest af hensyn til rytterens sikkerhedsprofil (partaftale)"
+                                  className="cursor-help text-amber-700 text-sm font-bold inline-flex items-center leading-none"
+                                >
+                                  🔒
+                                </span>
+                              )}
+                              {r.partaftale_godkendt_trods_niveau && hid === r.partaftale_hest_id && ' (godkendt)'}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    ) : r.partaftale_hest_id ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-800">
+                        <span>🐎 {hesteNavne.get(r.partaftale_hest_id) ?? 'Parthest'}</span>
+                        {r.har_paakraevet_hest && (
+                          <span
+                            title="Påkrævet hest af hensyn til rytterens sikkerhedsprofil (partaftale)"
+                            className="cursor-help text-amber-700 text-sm font-bold inline-flex items-center leading-none"
+                          >
+                            🔒
+                          </span>
+                        )}
                         {r.partaftale_godkendt_trods_niveau && ' (godkendt)'}
+                      </span>
+                    ) : r.har_paakraevet_hest ? (
+                      <span
+                        title="Påkrævet hest af hensyn til rytterens sikkerhedsprofil (partaftale)"
+                        className="cursor-help text-amber-700 text-sm font-bold inline-flex items-center leading-none"
+                      >
+                        🔒
                       </span>
                     ) : (
                       <span className="text-stone-400 text-xs">—</span>

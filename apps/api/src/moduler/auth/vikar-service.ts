@@ -18,7 +18,7 @@ export class VikarService {
   private static vikarMetadata = new Map<string, { navn?: string; fast_vikar?: boolean }>();
 
   /**
-   * Udsteder en ny tilfældig 6-cifret engangskode eller fast vikarkode.
+   * Udsteder en ny tilfældig 5-cifret engangskode eller fast vikarkode.
    * Klartekst returneres kun denne ene gang. Kode-hash gemmes med Argon2id.
    * Standard udløb er 90 dage (eller uendelig / konfigureret).
    */
@@ -26,12 +26,46 @@ export class VikarService {
     bruger: SessionBruger,
     input?: { navn?: string; fast_vikar?: boolean; udloeb_dage?: number | null },
   ): Promise<VikarKodeOpretSvar> {
-    const talkode = Math.floor(100000 + Math.random() * 900000).toString();
-    const hash = await argon2.hash(talkode, {
-      type: argon2.argon2id,
-      memoryCost: 19456,
-      timeCost: 2,
+    // Hent alle aktive eller anvendte koder for at garantere mod kodekollision
+    const aktiveKoder = await this.prisma.vikarEngangskode.findMany({
+      where: { status: { in: ['Aktiv', 'Anvendt'] } },
+      select: { kode_hash: true },
     });
+
+    let talkode = '';
+    let hash = '';
+    for (let forsoeg = 0; forsoeg < 30; forsoeg++) {
+      talkode = Math.floor(10000 + Math.random() * 90000).toString();
+      // Tjek mod kendte koder i in-memory cache
+      if (Array.from(VikarService.kendteKoder.values()).includes(talkode)) {
+        continue;
+      }
+      // Tjek mod eksisterende koder i databasen
+      let kolliderer = false;
+      for (const k of aktiveKoder) {
+        if (await argon2.verify(k.kode_hash, talkode)) {
+          kolliderer = true;
+          break;
+        }
+      }
+      if (!kolliderer) {
+        hash = await argon2.hash(talkode, {
+          type: argon2.argon2id,
+          memoryCost: 19456,
+          timeCost: 2,
+        });
+        break;
+      }
+    }
+
+    if (!hash) {
+      talkode = Math.floor(10000 + Math.random() * 90000).toString();
+      hash = await argon2.hash(talkode, {
+        type: argon2.argon2id,
+        memoryCost: 19456,
+        timeCost: 2,
+      });
+    }
 
     const nu = this.app.ur();
     // Hvis udloeb_dage er null/0, sæt til 10 år frem (udløber aldrig)
@@ -106,7 +140,7 @@ export class VikarService {
       orderBy: { udstedt_dato: 'desc' },
     });
 
-    const demoKandidater = ['123456', '654321', '888999'];
+    const demoKandidater = ['12345', '54321', '88899'];
     const resultat: VikarKodePost[] = [];
 
     for (const k of koder) {

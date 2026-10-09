@@ -470,6 +470,13 @@ description: "Opgaveliste for 001-holdadministration-mvp: Fase 1 PoC (User Story
 
 ---
 
+## 2.13 Fase 9: Soft Constraint Dispensation & Partaftale-Synkronisering (F2-M)
+
+- [X] T220 [P] [US2] Soft constraint dispensation ved kabalegodkendelse i `apps/web/src/admin/kabale/KabaleSide.tsx`, `packages/contracts/src/kabale.ts` og `apps/api/src/moduler/tildeling/publicering-service.ts`: Skeln mellem hårde velfærdsbrud og pædagogiske niveaubrud; gul dispensationsboks med bekræftelses-afkrydsning og "Godkend alligevel"; opdatering af kørslens samlede Welfare Guard-resultat ved manuelle justeringer og batch-tildelinger.
+- [X] T221 [P] [US4] Automatisk synkronisering og visning af påkrævede heste i `apps/api/src/moduler/ryttere/sikkerhedsprofil.ts`, `packages/contracts/src/stamdata.ts`, `apps/web/src/admin/ryttere/RyttereSide.tsx` og `apps/web/src/admin/kabale/HoldTabel.tsx`: Automatisk synkronisering af påkrævet hest til rytterens partaftale, ensretning af badges til "Partaftale" og `🔒 Påkrævet` symbol med forklarende tooltip ud for hestens navn i tabellerne.
+
+---
+
 ## Afhængigheder og rækkefølge
 
 ### Sektionsafhængigheder i Fase 1 (Gennemført)

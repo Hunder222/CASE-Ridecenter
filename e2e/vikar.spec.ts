@@ -22,9 +22,9 @@ test('V4: Vikarlogin og Cheat Sheet uden GDPR Art. 9 diagnoser (FR-012, SC-007, 
   await expect(page.getByText('Vikar-overlevering')).toBeVisible();
 
   // 2. Indtast vikarkode og fulde navn
-  // Hvis en aktiv kode findes (eller mock/testkode '123456')
+  // Hvis en aktiv kode findes (eller mock/testkode '12345')
   const kodeInput = page.locator('#vikarkode');
-  await kodeInput.fill('123456');
+  await kodeInput.fill('12345');
 
   const navnInput = page.locator('#fulde-navn');
   await navnInput.fill('Sofie Vikar');

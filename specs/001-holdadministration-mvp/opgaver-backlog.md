@@ -354,5 +354,222 @@ Dette dokument samler de specificerede forbedringer og opgaver til Stald-appen, 
   * Modalen i stald-appen er udvidet med store touch-knapper til Temperament (`Rolig`, `Normal`, `Frisk`), en One-Touch toggle til `🛡️ Skånehest` og tekstfelt til `Staldnoter`.
   * Hestekortene på stald-tabletten viser nu aktive badges for hestens temperament og skånehest-status.
 
+---
 
+## 13. Soft Constraint Dispensation & Godkendelses-flow [GENNEMFØRT]
 
+### 13.1 Admin Kabale (`/kabale`)
+- [x] **Adskillelse af Hard vs. Soft Constraints ved Godkendelse (`KabaleSide.tsx`, `KoerselOversigt.tsx`):**
+  * Hvis en holdfordeling udelukkende har overtrædelser af pædagogiske niveaubegrænsninger (`HC08_NIVEAU_BEGYNDER`, `HC08_NIVEAU_OEVET`, etc.) grundet kapacitetsmangel på begynderheste, blokeres godkendelsen ikke med en rød fejl.
+  * I stedet vises en gul advarselsboks med overblik over de registrerede niveau-uoverensstemmelser.
+  * Advarselsboksen indeholder afkrydsningsfeltet:
+    `[ ] Jeg bekræfter dispensation for uegnet hestetildeling`
+  * Knappen **"Godkend alligevel"** er deaktiveret, indtil afkrydsningsfeltet er markeret.
+  * Ved bekræftelse og godkendelse gemmes dispensationen i kørslen, status opdateres til `Godkendt`, og godkendelsen journaliseres i auditloggen med flaget `niveau_dispensation: true`.
+- [x] **API & Backend Håndtering (`contracts/kabale.ts`, `publicering-service.ts`, `routes.ts`):**
+  * `GodkendKoerselInput` udvidet med `tillad_niveau_dispensation: boolean`.
+  * `kontrollerPlan` tillader niveaudispensation (soft constraints) men opretholder 100% urokkelig validering for alle fysiske velfærdsregler (HC-01 dagsmax, HC-02 skånemax, HC-03 hviledag, HC-04 sygdom, HC-05 spring, HC-06 vægt/højde, HC-07 trauma/angst).
+
+---
+
+## 14. Statusvisning, Partaftale vs. Fast hest & Automatisk Synkronisering [GENNEMFØRT]
+
+### 14.1 Statusmærker og Soft Constraints i Tabeller (`/kabale`)
+- [x] **Korrekt differentiering mellem reelle velfærdsbrud og niveau-dispensation (`HoldTabel.tsx`, `BegrundelsePanel.tsx`):**
+  * Røde badges (`⚠️ Velfærdsbrud`) reserveres udelukkende til reelle fysiske velfærdsgrænser (dagsmaks, skånemaks, hviledag, sygemeldt hest, max vægt).
+  * Godkendte niveau-uoverensstemmelser markeres i stedet med en dæmpet ravgul badge: `⚠️ Niveau-dispensation`.
+  * Statusfiltreringen er rettet, så en hest med en dispensation på ét hold ikke fejlagtigt viser advarsel på hestens øvrige hold.
+  * Elever, der tildeles heste med dispensation, beholder deres grønne `1. ønske` badge, hvis hesten var deres eget ønske.
+
+### 14.2 Partaftale & Påkrævet hest Synkronisering (`/ryttere` & `/kabale`)
+- [x] **Ensretning af begreber & visning (`HoldTabel.tsx`):**
+  * Begrebet "Fast hest" er i tabeller og badges ensrettet til det velkendte **Partaftale** (blå badge).
+- [x] **Automatisk synkronisering af Sikkerhedsprofil til Partaftale (`sikkerhedsprofil.ts`, `stamdata.ts`, `RyttereSide.tsx`):**
+  * Når en hest vælges som **Påkrævet hest** under en rytters Sikkerhedsprofil, synkroniseres hesten automatisk til rytterens profil som `partaftale_hest_id`.
+  * Fjerner man påkrævede heste fra profilen, nulstilles feltet automatisk.
+  * I oversigterne på både `/ryttere` og `/kabale` vises et tydeligt `🔒 Påkrævet` symbol ud for hestens navn med tooltip: *"Påkrævet hest af hensyn til rytterens sikkerhedsprofil"*.
+  * Test- og demodata (`fredag-ryttere.ts`) opdateret, så elever med påkrævede heste (f.eks. Anna Gammelgård og Filippa Udby) har hesten synkroniseret og synlig som parthest.
+
+---
+
+## 15. PIN-adskillelse, Admin Forbedringer & Tablet Stald Justeringer [GENNEMFØRT]
+
+### 15.1 Generel & PIN-sikkerhed
+- [x] **Sofie som permanent fast vikar & mulighed for at spærre aktive anvendte koder:**
+  * Sofie er oprettet med fast vikarprofil og 5-cifret kode (`12345`).
+  * Muligheden for at spærre midlertidige vikarkoder forbliver tilgængelig i `/admin/vikarkoder`, selv efter koden er taget i brug (`k.status === 'Aktiv' || k.status === 'Anvendt'`).
+  * Filer: [`VikarKoderSide.tsx`](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/apps/web/src/admin/VikarKoderSide.tsx), [`skriv-seed.ts`](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/tools/seed/skriv-seed.ts).
+- [x] **Garanteret kollisionssikring for vikar-engangskoder:**
+  * `udstedVikarKode` tjekker mod alle eksisterende koder i databasen og in-memory cache, så en ny kode aldrig matcher en eksisterende kode.
+  * Fil: [`vikar-service.ts`](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/apps/api/src/moduler/auth/vikar-service.ts).
+- [x] **Differentieret PIN-længde (Personalekoder 6 cifre vs. Vikarkoder 5 cifre):**
+  * Ikke-vikar koder (Ledelse, Ridelærere, Staldelever) er skiftet fra 4 til 6 cifre (`111111`, `222222`, osv.).
+  * Vikarkoder er skiftet til 5 cifre (`12345`, `54321`, osv.).
+  * Numeriske tastaturer, valideringsskemaer og prik-indikatorer er opdateret tilsvarende.
+  * Filer: [`contracts/src/stald.ts`](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/packages/contracts/src/stald.ts), [`LaasSide.tsx`](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/apps/web/src/stald/LaasSide.tsx), [`VikarSide.tsx`](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/apps/web/src/stald/VikarSide.tsx), [`brugere-og-hold.ts`](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/tools/seed/data/brugere-og-hold.ts).
+
+### 15.2 Admin
+- [x] **/heste – Tekstkontrast ved aktive statusfiltre (`HesteSide.tsx`):**
+  * Ved klik på de 4 statuskort (Raske, Sygemeldte, Skadede, Karantæne) sikres hvid tekst (`text-white`) mod baggrunden for optimal læsbarhed.
+- [x] **/kabale – Præcis hold-specifik dispensation og bevarelse af 1. ønske (`HoldTabel.tsx`):**
+  * Hvis en tildeling er rytterens 1. (eller 2./3.) ønske, vises det grønne ønske-badge altid (`1. ønske`).
+  * `DISPENSATION` badges begrænses til kun reelle niveau-uoverensstemmelser på det konkrete hold (f.eks. `HC08_NIVEAU_BEGYNDER` kun på begynderhold), så en hests begynder-dispensation ikke fejlagtigt smitter af på hestens øvrige hold. Ved tildelinger uden opfyldt ønske vises `DISPENSATION`.
+- [x] **/oensker – Tablet-lignende redigering (`OenskerSide.tsx`):**
+  * Redigeringsdialogen for ønsker viser nu heste opdelt i "Top 5 egnede heste", "Øvrige egnede" og "Uegnede heste", svarende til tablet-brugerfladen.
+- [x] **/oensker – Fane for "Delvist udfyldt" (`OenskerSide.tsx`):**
+  * Tilføjet fane med optælling for elever med 1 eller 2 ønsker: `Delvist udfyldt ({antalDelvist})`.
+- [x] **/oensker – Sorterbare kolonner (`OenskerSide.tsx`):**
+  * Tabellen kan sorteres efter Elev, Niveau, 1. prioritet, 2. prioritet og 3. prioritet (både stigende og faldende).
+- [x] **/kabale – Visning af dispensationsmulighed for ikke-tildelte elever (`KabaleSide.tsx`):**
+  * Listen over elever uden hest angiver nu for hver elev, om der findes egnede dispensationsheste (`🟡 Dispensation mulig`) eller ej (`🔴 Ingen dispensation mulig`).
+- [x] **/kabale – Månedsskift som knapper (`KabaleSide.tsx`):**
+  * "← Forrige måned" og "Næste måned →" er stylet som tydelige knap-elementer.
+- [x] **/ryttere – Tilmeldte hold kolonne & Påkrævet-symbol (`RyttereSide.tsx`, `mapper.ts`, `routes.ts`, `stamdata.ts`):**
+  * Ny kolonne "Tilmeldte hold" viser rytterens aktive hold med fuld sorteringsstøtte.
+  * Tydeligt `🔒 Påkrævet` badge ved ryttere med obligatorisk hest.
+
+### 15.3 Tablet Stald
+- [x] **/lektion – Akut hesteerstatning altid tilgængelig (`LektionSide.tsx`):**
+  * Knappen "Erstat hest" vises altid direkte ved ryttere med advarsel (f.eks. sygemeldt/skadet hest), uden at man skal aktivere "Redigér heste"-tilstand først.
+- [x] **/oensker – Begrænsning på springhold (`OenskerLektionSide.tsx`):**
+  * På springhold kan der kun vælges og ønskes heste, som er godkendt til spring (`spring_godkendt === true`).
+- [x] **/oensker – Ekskluder heste på hviledag (`OenskerLektionSide.tsx`):**
+  * Heste med hviledag på holdets ugedag kan ikke vælges som ønske.
+- [x] **/oensker – Forkortet fysiologitekst (`OenskerLektionSide.tsx`):**
+  * Advarselsteksten "⚠️ Ikke godkendt til rytterens fysiologi" er forkortet til det mere kompakte "⚠️ rytter fysiologi".
+
+---
+
+## 16. Ønskeadvarsler, Partaftale-status, UI-polering & Holdkalender [FULDFØRT]
+
+### 16.1 Generel & Elevønsker
+- [x] **/oensker – ⚠️ Advarselsikon og tooltip ved problematiske hesteønsker:**
+  * Hvis en elev har ønsket en hest, der har udfordringer (f.eks. ikke springgodkendt på springhold, sygemeldt/skadet hest, hviledag på holdets ugedag, eller fysiologisk mismatch), vises et `⚠️` ikon ved hestens navn med forklarende tooltip.
+  * Filer: [`OenskerSide.tsx`](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/apps/web/src/admin/oensker/OenskerSide.tsx), [`OenskerLektionSide.tsx`](file:///c:/Users/Hunte/Documents/EK/EK-Kode/3.%20semester/Tv%C3%A6rfagligt/CASE-Ridecenter/apps/web/src/stald/OenskerLektionSide.tsx).
+
+### 16.2 Admin
+- [x] **/oensker – Elever med partaftale markeres med Partaftale (blå) og tæller ikke som delvist/mangler:**
+  * Elever med partaftale skal have status `Partaftale` (blå badge) i stedet for `Mangler` eller `Delvist udfyldt`, og tæller ikke med som manglende/delvise ønsker i hverken `/admin/oensker` eller `/admin/kabale` statistikken.
+- [x] **/kabale – Større overskrift og knap til særtilladelse (Soft constraint):**
+  * I "Ikke tildelt" popup gøres overskriften "💡 Særtilladelse (Soft constraint)" og knappen `⚡ Særtildel alle (dispensation)` større og mere fremtrædende.
+- [x] **/kabale – Læsevenlige sikkerhedskoder med navn i parentes:**
+  * Koder som `HC08_NIVEAU_BEGYNDER:ID` oversættes så hestens (eller rytterens) navn vises i parentes: f.eks. `HC08_NIVEAU_BEGYNDER:ID(Zigge)`.
+- [x] **Danske tegn Æ, Ø, Å:**
+  * Ensretning af betegnelser: "Letoevet" -> "Letøvet", "Oevet" -> "Øvet", "Traekhold" -> "Trækhold", osv.
+- [x] **/dashboard – Nøgletal for udnyttelse af Begynder-, Øvet- og Spring-heste:**
+  * Ved siden af holdudnyttelse tilføjes nøgletal for kapacitetsmætning for Begynder-heste, Øvet-heste og Spring-heste (inkl. visning af >100% mætning).
+- [x] **/rapporter – Toggle switch mellem hel måned og specifikt datointerval:**
+  * Mulighed for at vælge enten en hel måned eller en specifik fridato-periode (fra/til dato).
+- [x] **/kabale – Advarsel om aktiv indstilling for springheste:**
+  * Advarselsbjælke i toppen vises både for "Reserver begynder-heste til begynderhold først" og "Reserver spring-heste til springhold først".
+- [x] **/kabale – Oprydning i godkendelsesknapper ved soft constraints:**
+  * Fjern den overflødige lille "✓ Godkend alligevel" knap, så kun den primære store "⚠️ Godkend med dispensation" benyttes.
+- [x] **/kabale – Advarsel og bekræftelsesboks ved publicering med manglende tildelinger:**
+  * Hvis der fortsat er elever uden tildelt hest ved publicering, vises en advarselsboks og en påkrævet checkbox ("Jeg bekræfter at publicere planen med manglende hestetildelinger... Opfordrer til forældrekontakt") før "Publicér"-knappen aktiveres.
+- [x] **/oensker – Sortering på status:**
+  * Tabellen kan sorteres efter statuskolonnen.
+- [x] **/oensker – Udskift |Niveau| med "Holdtype":**
+  * Kolonnen "Niveau" erstattes med "Holdtype" (f.eks. "Begynder", "Letøvet spring", "Øvet", "Trækhold", "Parthold").
+
+### 16.3 Tablet Stald
+- [x] **/oensker (stald) – Partaftale elever tæller ikke med i "Mangler":**
+  * Elever med partaftale vises med `Partaftale` badge og tæller ikke som manglende i "Mangler (X)".
+- [x] **/oensker (stald) – Skjul uvalgte niveau-sektioner ved filtrering & tilføj Trækhold og Parthold:**
+  * Når et niveau vælges, skjules tomme/uvalgte sektionsoverskrifter helt. Filtrene udvides med "Trækhold" og "Parthold".
+- [x] **/i-dag – Ret kalender navigation bug & omdøb til Holdkalender:**
+  * Gennemgang af måneder i kalenderen overskriver ikke den valgte dato; "Næste program" navigerer fra den aktuelt viste dato. Knappen "Månedskalender" omdøbes til "Holdkalender".
+- [x] **/oensker (stald) – Omdøb vejledningstekst:**
+  * "💡 Forbeholdt begynderhold ved kabale" forkortes til "💡 Forbeholdt begynderhold".
+
+---
+
+## 17. Kabale Søgning, Ønsker Layout & Advarselsharmonisering [FULDFØRT]
+
+### 17.1 Admin
+- [x] **/kabale – Søgefelt på tværs af heste, elever og holdtitler (`HoldTabel.tsx`, `KabaleSide.tsx`):**
+  * Samlet filtreringsfelt i `/admin/kabale`, som søger på tværs af ugedag (f.eks. "mandag"), tidspunkt (f.eks. "15:00"), holdtype/niveau ("Letøvet", "Øvet", "Trækhold"), elevens navn og hestens navn.
+- [x] **/oensker – Horisontal plads, ingen linjeskift på status & holdtype (`OenskerSide.tsx`):**
+  * Kolonnerne "Status" og "Holdtype" er gjort bredere med `whitespace-nowrap`, mens spildplads mellem de tre prioriteter er reduceret med faste, afbalancerede kolonnebredder.
+- [x] **/oensker – Harmonisering af "Kan ikke opfyldes" og ⚠️ advarsler (`OenskerSide.tsx`):**
+  * **Afklaring**: "Kan ikke opfyldes" stammer fra elevens sikkerhedsprofil (**HC-07** - forbudte heste, temperamentkrav osv.), mens `⚠️` stammer fra driftsmæssige forhold (sygemeldt hest, springforbud på springhold, hviledag på holddagen eller elevens vægt/højde).
+  * **Harmonisering**: Slut med forvirrende dobbelte mærkninger (både ⚠️ og "Kan ikke opfyldes") eller manglende tooltips. Hvis ønsket er spærret af HC-07, vises en kompakt rød badge `⛔ Kan ikke opfyldes` med fuld forklarende tooltip (inklusive evt. driftsmæssige advarsler). Hvis hesten er godkendt i sikkerhedsprofilen, men har driftsmæssige forhindringer, vises det gule `⚠️` ikon med forklarende tooltip.
+
+---
+
+## 18. Spring-kapacitet Forklaring, Flere Partsheste & Stald Ønskestatus [FULDFØRT]
+
+### 18.1 Admin
+- [x] **/dashboard – Undernote om spring-kapacitet og flaskehals på holddagen (`dashboard-service.ts`, `DashboardSide.tsx`):**
+  * **Afklaring**: Selvom der teoretisk er 18 springheste på ugebasis til 16 elever (89%), afholdes alle springhold samlet om tirsdagen. Her har 3 springheste fast hviledag, så den reelle kapacitet på selve holddagen kun er 15 heste til 16 elever (107% mætning).
+  * På Dashboard vises nu en fremhævet undernote for holddags-flaskehalsen, så ledelsen straks kan se hvorfor 1 elev ikke kan få en springhest.
+- [x] **/oensker & /ryttere – Afklaring: "Kun rolige heste" er Hard Constraint (HC-07):**
+  * **Afklaring**: Jf. forfatningens Princip II er sikkerhedsprofilen (`kun_rolige_heste`) en ufravigelig Hard Constraint (**HC07_KUN_ROLIG**). Ryttere med faldtraume eller rolig-krav må aldrig tildeles friske heste (Boy, Pixie, Freya, Cornelius). I `/admin/oensker` vises og forklares dette entydigt som `⛔ Kan ikke opfyldes: Frisk hest må ikke tildeles rytter med rolig-krav (HC-07 Sikkerhedsprofil)`.
+- [x] **/ryttere – Understøt flere partsheste for en elev & visning i tabel (`stamdata.ts`, `mapper.ts`, `RyttereSide.tsx`, `RytterDetaljeSide.tsx`):**
+  * Elever som f.eks. Filippa Udby kan have mere end 1 påkrævet hest / parthest (f.eks. både Aslan og Toobi). Kontrakten og DTO'en udvides med `partaftale_hest_ids` og `paakraevede_hest_ids`, og alle heste vises nu i tabellen på `/admin/ryttere` og på elevprofilen.
+- [x] **/ryttere – Udskift "🔒 Påkrævet" med "🔒" og bevar tooltip:**
+  * Teksten "🔒 Påkrævet" er erstattet med det mere diskrete, men let forstørrede ikon `🔒` med fuld forklarende tooltip (`title="Påkrævet hest af hensyn til rytterens sikkerhedsprofil (partaftale)"`).
+
+### 18.2 Tablet Stald
+- [x] **/oensker (stald) – Tilføj "Mangler delvist" (orange) og gør "Mangler" (rød) (`OenskerLektionSide.tsx`):**
+  * Statusknapperne opdeles nu i:
+    * `⛔ Mangler (X)` i **RØD** for elever med 0 registrerede ønsker.
+    * `⚠️ Mangler delvist (X)` i **ORANGE** for elever med 1 eller 2 ønsker.
+    * `✓ Klar (X)` i **GRØN** for elever med alle 3 ønsker.
+    * `Partaftale (X)` i **BLÅ**.
+  * Elevkortenes baggrunde og badges i oversigten matcher farverne tilsvarende (rød for 0/3, orange for 1-2/3, grøn for 3/3).
+
+---
+
+## 19. Forenklet Dashboard Kapacitet, Manuel Kabale Beregningstid & Raskmelding fra Stald [FULDFØRT]
+
+### 19.1 Admin
+- [x] **/kabale – Skjul "Beregnet på X ms" ved manuel fordeling (`KoerselOversigt.tsx`):**
+  * Ved manuel papirarksfordeling (oktober) vises "Beregnet på X ms" ikke længere, da fordelingen stammer fra fysiske papirark og ikke er beregnet i kørecomputeren.
+- [x] **/dashboard – Forenklet & ensartet kapacitetsvisning på alle 4 kort (`DashboardSide.tsx`, `dashboard-service.ts`, `ledelse.ts`):**
+  * Ensartet og rolig visning uden voldsom rød styling på kortene:
+    * Stor procent `X%` (effektiv holddags-kapacitet, der tager højde for hestehviledage på holdenes afholdelsesdage).
+    * Lille `(Y% ugebasis)` ved siden af den store procent.
+    * Rød diskret `>100% holddag` badge i toppen, hvis en specifik holddag overskrider kapaciteten (vises både på begynderheste og springheste).
+    * Diskret infoboks i bunden: `💡 X% er inkl. planlagte hestehviledage`.
+  * Reglen om at tage højde for hestenes faste hviledage gælder nu alle 4 kapacitetsfelter: "Holdudnyttelse (samlet)", "Begynder-heste", "Øvet-heste" og "Spring-heste".
+
+### 19.2 Tablet Stald
+- [x] **/heste – Raskmelding direkte fra stalden & udvidede forslag (`HesteOversigtSide.tsx`, `status-service.ts`, `omplacering-sync.ts`, `stald.ts`):**
+  * Hestekortene har fået en direkte `[🟢 Meld rask]` knap for sygemeldte/skadede heste.
+  * I statusmodalen kan man vælge alvorligheden `🟢 Meld rask / Klar`, hvilket straks sætter hestens sundhedsstatus tilbage til 'Aktiv' (både lokalt i Dexie og på serveren) samt rydder akutte advarselsnotifikationer.
+  * Tilføjet 13 relevante hurtige forslag til beskrivelser (`Halter svagt`, `Tydeligt halt`, `Mangler/tabt sko`, `Løs sko`, `Hoste/feber`, `Sår/hævelse`, `Øm i ryg`, `Gnavsår`, `Urolig i boks`, `Napper/bider`, `Sparker ud`, `Raskmeldt og klar`, `Godkendt af dyrlæge/smed`).
+- [x] **/heste – Rettet hjælpetekst for 'Kan ikke bruges' (`HesteOversigtSide.tsx`):**
+  * Hjælpeteksten opdateret fra `"⚠️ Bemærk: 'Kan ikke bruges' sygemelder straks hesten, så den ikke kan tildeles eller rides på i dag."` til:
+  * `"⚠️ Bemærk: 'Kan ikke bruges' sygemelder straks hesten, så den ikke kan tildeles eller rides på, indtil den er meldt rask."`
+
+---
+
+## 20. Klikbare Dashboard-nøgletal, Holdudnyttelse Afklaring, Stald Skader & Karantæne samt Dynamiske Forslag [FULDFØRT]
+
+### 20.1 Admin
+- [x] **/dashboard – Klikbare nøgletal for hurtig navigation (`DashboardSide.tsx`):**
+  * Nøgletalskortene "Heste ude af drift", "Ventelisteforslag" og "Aktive vikarkoder" er nu interaktive knapper med tydelig hover-effekt og navigationspile, der fører direkte til henholdsvis `/admin/heste`, `/admin/venteliste` og `/admin/vikarkoder`.
+- [x] **/dashboard – Afklaring & tilpasning af samlet holdudnyttelse (dagsbasis vs. ugebasis) (`dashboard-service.ts`):**
+  * **Afklaring**: Ugebasis (62%) sammenligner ugens samlede elevtilmeldinger mod ugens samlede udbudte holdpladser (117 elever / 190 pladser). Den tidligere dagsbasis (56%) sammenlignede elevtilmeldinger mod *alle* staldens hestes teoretiske lektionskapacitet (36 hestelektioner), hvilket gav et misvisende billede på dage, hvor der ikke var planlagt hold svarende til fuld hestekapacitet.
+  * Beregningen er nu gjort holdcentreret (`erHoldCentreret: true`), så dagsudnyttelsen måles mod de faktiske udbudte holdpladser på holddagene (begrænset af hestenes reelle kapacitet, hvis hestehviledage eller sygdom skaber en flaskehals).
+- [x] **/dashboard – Layoutrokering på kapacitetsudnyttelse (`DashboardSide.tsx`):**
+  * Ved siden af den store procent vises nu den præciserende tekst `inkl. planlagte hestehviledage`.
+  * Nedenunder er ugebasis flyttet om bag mængden: `X elever / Y pladser (Z% ugebasis)`.
+
+### 20.2 Tablet Stald
+- [x] **/heste – Mulighed for at melde "🟠 Skadet" og "🟣 Karantæne" direkte fra stalden (`HesteOversigtSide.tsx`, `status-service.ts`, `routes.ts`, `contracts/src/stald.ts`, `omplacering-sync.ts`):**
+  * Stalden har nu direkte adgang til at melde heste som `🟠 Skadet` eller `🟣 Karantæne` foruden `Obs` og `Sygemeldt`.
+  * Hestens `sundhedsstatus` opdateres straks både i den lokale Dexie-database og på serveren, og udløser automatisk nødvendige driftsnotifikationer og isolationsmarkeringer.
+  * Hesteoversigten har fået udvidede filtre og badges for `🟣 Karantæne`.
+- [x] **/heste – Dynamiske hurtige forslag i statusmodalen (`HesteOversigtSide.tsx`):**
+  * Listen over forslags-chips tilpasser sig nu dynamisk i realtid baseret på både valgt "Type melding" (Helbred vs. Adfærd) og "Alvorlighed/Status":
+    * **Helbred - Skadet**: Forslag som halter, tabt sko, løs sko, sår på piben, hævelse i seneskede, trådt på søm.
+    * **Helbred - Sygemeldt**: Feber over 38.3°C, hoste/næseflåd, koliksymptomer, vil ikke spise, diarré, øjenbetændelse.
+    * **Helbred - Karantæne**: Mistanke om kværke, høj feber/hævede kirtler, isoleret i karantæneboks, afventer dyrlægepodning.
+    * **Helbred - Obs**: Let stiv i start, hoste fra støv, hold øje med bagben, overfladisk skramme, spiser langsomt.
+    * **Helbred - Raskmeldt**: Godkendt af dyrlæge, godkendt af smed, haltfri, feberfri, normal appetit.
+    * **Adfærd (Obs / Sygemeldt / Raskmeldt)**: Urolig i boks, stresset ved opsadling, bider/napper, truer med bagben, bukker, stejler, afbalanceret.
+- [x] **/heste – Optimeret vertikal størrelse & 2-rækket horisontal scroll for hurtige forslag (`HesteOversigtSide.tsx`):**
+  * Modalen er udvidet i bredden til `max-w-2xl` (672px) med `max-h-[92vh]` for et mere afbalanceret format på tablets.
+  * Alvorlighedsknapperne ved Helbred udnytter den øgede bredde og ligger nu i én kompakt række med 6 kolonner (`sm:grid-cols-6`), hvilket sparer en hel linjes højde.
+  * De dynamiske forslag er omstruktureret til et kompakt 2-rækket felt med horisontal scrolling (`grid-rows-2 grid-flow-col auto-cols-max overflow-x-auto`). Ca. 6-8 forslag er synlige på skærmen samtidig, og resterende forslag kan nemt swipes/scroles til højre uden at skubbe indsend-knappen ud af syne.

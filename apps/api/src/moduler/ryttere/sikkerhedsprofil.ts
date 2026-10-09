@@ -81,12 +81,27 @@ export const sikkerhedsprofilRuter: FastifyPluginAsyncZod = async (app) => {
           opdateret_af: bruger.id,
           opdateret: app.ur(),
         };
+        const foer = rytter.sikkerhedsprofil;
         await tx.sikkerhedsprofil.upsert({
           where: { rytter_id: id },
           create: { rytter_id: id, ...data },
           update: data,
         });
-        const foer = rytter.sikkerhedsprofil;
+
+        // Automatisk synkronisering: En påkrævet hest er automatisk også en partaftale-hest
+        const valgtPaakraevetHest = input.paakraevede_heste[0] ?? null;
+        if (valgtPaakraevetHest) {
+          await tx.rytter.update({
+            where: { id },
+            data: { partaftale_hest_id: valgtPaakraevetHest },
+          });
+        } else if (foer?.paakraevede_heste?.length && rytter.partaftale_hest_id && foer.paakraevede_heste.includes(rytter.partaftale_hest_id)) {
+          // Hvis påkrævede heste fjernes helt, og rytterens parthest stammede derfra, nulstilles den
+          await tx.rytter.update({
+            where: { id },
+            data: { partaftale_hest_id: null },
+          });
+        }
         await logHaendelse(tx, {
           handling: 'SIKKERHEDSPROFIL_AENDRET',
           entitet: 'sikkerhedsprofil',

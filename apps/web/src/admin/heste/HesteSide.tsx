@@ -375,7 +375,9 @@ export function HesteSide() {
               : 'bg-white text-stone-800 border-stone-200 hover:bg-emerald-50/50'
           }`}
         >
-          <div className="text-xs uppercase tracking-wider font-semibold text-emerald-600">🟢 Raske & Aktive</div>
+          <div className={`text-xs uppercase tracking-wider font-semibold ${filter === 'Aktiv' ? 'text-white' : 'text-emerald-600'}`}>
+            🟢 Raske & Aktive
+          </div>
           <div className="text-2xl font-bold mt-0.5">{tællere.aktiv}</div>
         </button>
 
@@ -388,7 +390,9 @@ export function HesteSide() {
               : 'bg-white text-stone-800 border-stone-200 hover:bg-rose-50/50'
           }`}
         >
-          <div className="text-xs uppercase tracking-wider font-semibold text-rose-600">🔴 Sygemeldte</div>
+          <div className={`text-xs uppercase tracking-wider font-semibold ${filter === 'Sygemeldt' ? 'text-white' : 'text-rose-600'}`}>
+            🔴 Sygemeldte
+          </div>
           <div className="text-2xl font-bold mt-0.5">{tællere.syg}</div>
         </button>
 
@@ -401,7 +405,9 @@ export function HesteSide() {
               : 'bg-white text-stone-800 border-stone-200 hover:bg-amber-50/50'
           }`}
         >
-          <div className="text-xs uppercase tracking-wider font-semibold text-amber-600">🟠 Skadede / Obs</div>
+          <div className={`text-xs uppercase tracking-wider font-semibold ${filter === 'Skadet' ? 'text-white' : 'text-amber-600'}`}>
+            🟠 Skadede / Obs
+          </div>
           <div className="text-2xl font-bold mt-0.5">{tællere.skadet}</div>
         </button>
 
@@ -414,7 +420,9 @@ export function HesteSide() {
               : 'bg-white text-stone-800 border-stone-200 hover:bg-purple-50/50'
           }`}
         >
-          <div className="text-xs uppercase tracking-wider font-semibold text-purple-600">🟣 Karantæne</div>
+          <div className={`text-xs uppercase tracking-wider font-semibold ${filter === 'Karantaene' ? 'text-white' : 'text-purple-600'}`}>
+            🟣 Karantæne
+          </div>
           <div className="text-2xl font-bold mt-0.5">{tællere.karantaene}</div>
         </button>
       </div>

@@ -143,6 +143,8 @@ export class PullService {
           godkendte_heste: godkendteHeste,
           cheat_sheet_koder: profil?.cheat_sheet_koder ?? [],
           adfaerdsinstruks,
+          har_partaftale: Boolean(rytter.partaftale_hest_id),
+          partaftale_hest_id: rytter.partaftale_hest_id,
         });
       }
 
@@ -316,6 +318,8 @@ export class PullService {
             godkendteHeste,
             cheatSheetKoder: p.rytter.sikkerhedsprofil?.cheat_sheet_koder ?? [],
             adfaerdsinstruks: instruks,
+            har_partaftale: Boolean(p.rytter.partaftale_hest_id),
+            partaftale_hest_id: p.rytter.partaftale_hest_id,
           };
         }),
         heste: heste.map((h) => ({

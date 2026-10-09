@@ -75,6 +75,14 @@ export const Tildelingskoersel = z.object({
 });
 export type Tildelingskoersel = z.infer<typeof Tildelingskoersel>;
 
+export const GodkendKoerselInput = z
+  .strictObject({
+    tillad_niveau_dispensation: z.boolean().optional(),
+  })
+  .optional()
+  .nullable();
+export type GodkendKoerselInput = z.infer<typeof GodkendKoerselInput>;
+
 /** Manuel justering. Der findes intet override-felt (Princip I). */
 export const ManuelJustering = z.strictObject({
   hest_id: Uuid,

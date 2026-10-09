@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from 'react';
 
+const NIVEAU_LABELS: Record<string, string> = {
+  Traekhold: 'Trækhold',
+  Begynder: 'Begynder',
+  Letoevet: 'Letøvet',
+  Oevet: 'Øvet',
+  Parthold: 'Parthold',
+};
+
 export const VentelisteSide: React.FC = () => {
   const [data, setData] = useState<{ poster: any[]; afventende_forslag: any[] } | null>(null);
   const [indlaeser, setIndlaeser] = useState(true);
@@ -249,7 +257,7 @@ export const VentelisteSide: React.FC = () => {
                       {p.rytter?.fornavn} {p.rytter?.efternavn}
                     </td>
                     <td className="px-5 py-3.5 text-xs">
-                      {p.oensket_niveau ?? 'Specifikt hold'}
+                      {p.oensket_niveau ? (NIVEAU_LABELS[p.oensket_niveau] ?? p.oensket_niveau) : 'Specifikt hold'}
                     </td>
                     <td className="px-5 py-3.5 text-xs font-mono">
                       {new Date(p.tilmeldingsdato).toLocaleDateString('da-DK')}

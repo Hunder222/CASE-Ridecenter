@@ -8,14 +8,21 @@ interface ElevMatrixData {
   rytterNavnKort: string;
   niveau: string;
   holdnavn: string;
+  erSpringhold?: boolean;
+  ugedag?: number;
   godkendteHeste: string[];
   oensker: string[]; // hest_id'er (prioritet 1, 2, 3)
+  harPartaftale?: boolean;
+  partaftaleHestId?: string | null;
 }
 
 function normaliserNiveau(niveau: string): string {
-  if (niveau.toLowerCase().includes('begynder')) return 'Begynder';
-  if (niveau.toLowerCase().includes('letoevet') || niveau.toLowerCase().includes('letøvet')) return 'Letøvet';
-  if (niveau.toLowerCase().includes('oevet') || niveau.toLowerCase().includes('øvet')) return 'Øvet';
+  const n = (niveau ?? '').toLowerCase();
+  if (n.includes('traek') || n.includes('træk')) return 'Trækhold';
+  if (n.includes('begynder')) return 'Begynder';
+  if (n.includes('letoevet') || n.includes('letøvet')) return 'Letøvet';
+  if (n.includes('oevet') || n.includes('øvet')) return 'Øvet';
+  if (n.includes('part')) return 'Parthold';
   return niveau;
 }
 
@@ -23,6 +30,15 @@ function evaluerHestEgnethed(
   hest: LokalHest,
   elev: ElevMatrixData
 ): { egnet: boolean; aarsag?: string } {
+  if (hest.sundhedsstatus && hest.sundhedsstatus !== 'Aktiv') {
+    return { egnet: false, aarsag: `Hesten er pt. ${hest.sundhedsstatus.toLowerCase()}` };
+  }
+  if (elev.erSpringhold && (hest.springforbud || (hest.max_spring_uge ?? 0) <= 0)) {
+    return { egnet: false, aarsag: 'Må ikke springe' };
+  }
+  if (elev.ugedag && hest.hviledag === elev.ugedag) {
+    return { egnet: false, aarsag: 'Hviledag på holdets ugedag' };
+  }
   if (elev.niveau === 'Begynder' && !hest.godkendt_til_begyndere) {
     return { egnet: false, aarsag: 'Ikke godkendt til begyndere' };
   }
@@ -30,7 +46,7 @@ function evaluerHestEgnethed(
     return { egnet: false, aarsag: 'Ikke egnet til øvede' };
   }
   if (elev.godkendteHeste && elev.godkendteHeste.length > 0 && !elev.godkendteHeste.includes(hest.id)) {
-    return { egnet: false, aarsag: 'Ikke godkendt til rytterens fysiologi' };
+    return { egnet: false, aarsag: '⚠️ rytter fysiologi' };
   }
   return { egnet: true };
 }
@@ -46,7 +62,7 @@ export function OenskerLektionSide() {
 
   // Filter & Søgning
   const [filterNiveau, setFilterNiveau] = useState<string>('Alle');
-  const [filterStatus, setFilterStatus] = useState<'Alle' | 'Mangler' | 'Klar'>('Alle');
+  const [filterStatus, setFilterStatus] = useState<'Alle' | 'Mangler' | 'Delvist' | 'Klar' | 'Partaftale'>('Alle');
   const [soeg, setSoeg] = useState<string>('');
 
   // Aktiv elev der redigeres i modal
@@ -134,6 +150,8 @@ export function OenskerLektionSide() {
                     godkendteHeste: pl.godkendte_heste,
                     cheatSheetKoder: pl.cheat_sheet_koder,
                     adfaerdsinstruks: pl.adfaerdsinstruks,
+                    har_partaftale: pl.har_partaftale,
+                    partaftale_hest_id: pl.partaftale_hest_id,
                   });
                 }
               }
@@ -184,13 +202,33 @@ export function OenskerLektionSide() {
         const holdnavn = l?.holdnavn ?? 'Hold';
         const oensker = (oenskerMap.get(p.rytterId) ?? []).filter(Boolean);
 
+        const holdNavnLower = (l?.holdnavn ?? '').toLowerCase();
+        let ugedag = 0;
+        if (holdNavnLower.includes('mandag')) ugedag = 1;
+        else if (holdNavnLower.includes('tirsdag')) ugedag = 2;
+        else if (holdNavnLower.includes('onsdag')) ugedag = 3;
+        else if (holdNavnLower.includes('torsdag')) ugedag = 4;
+        else if (holdNavnLower.includes('fredag')) ugedag = 5;
+        else if (holdNavnLower.includes('lørdag') || holdNavnLower.includes('loerdag')) ugedag = 6;
+        else if (holdNavnLower.includes('søndag') || holdNavnLower.includes('soendag')) ugedag = 7;
+        else if (l?.dato) {
+          const d = new Date(l.dato);
+          ugedag = d.getDay() === 0 ? 7 : d.getDay();
+        }
+
+        const erSpringhold = Boolean(l?.erSpringhold || holdNavnLower.includes('spring'));
+
         ryttereMap.set(p.rytterId, {
           rytterId: p.rytterId,
           rytterNavnKort: p.rytterNavnKort ?? 'Rytter',
           niveau,
           holdnavn,
+          erSpringhold,
+          ugedag,
           godkendteHeste: p.godkendteHeste ?? [],
           oensker,
+          harPartaftale: Boolean(p.har_partaftale || p.partaftale_hest_id),
+          partaftaleHestId: p.partaftale_hest_id ?? null,
         });
       }
 
@@ -223,6 +261,14 @@ export function OenskerLektionSide() {
     const ikkeEgnede: Array<{ hest: LokalHest; aarsag?: string }> = [];
 
     for (const h of heste) {
+      // Hvis elev skal ønske til springhold, vises kun heste der må springe
+      if (redigerElev.erSpringhold && (h.springforbud || (h.max_spring_uge ?? 0) <= 0)) {
+        continue;
+      }
+      // Giv aldrig mulighed for at ønske en hest, der har hviledag på samme ugedag man har tildelt hold
+      if (redigerElev.ugedag && h.hviledag === redigerElev.ugedag) {
+        continue;
+      }
       const res = evaluerHestEgnethed(h, redigerElev);
       if (res.egnet) {
         egnede.push({ hest: h });
@@ -238,6 +284,15 @@ export function OenskerLektionSide() {
   }, [heste, redigerElev]);
 
   const toggleHestOenske = (hestId: string) => {
+    const valgtHest = hesteMap.get(hestId);
+    if (valgtHest && redigerElev?.ugedag && valgtHest.hviledag === redigerElev.ugedag) {
+      alert('Denne hest har hviledag på holdets ugedag og kan ikke ønskes.');
+      return;
+    }
+    if (valgtHest && redigerElev?.erSpringhold && (valgtHest.springforbud || (valgtHest.max_spring_uge ?? 0) <= 0)) {
+      alert('Denne hest må ikke springe og kan ikke vælges til et springhold.');
+      return;
+    }
     if (valgteOensker.includes(hestId)) {
       setValgteOensker(valgteOensker.filter((id) => id !== hestId));
     } else {
@@ -326,14 +381,16 @@ export function OenskerLektionSide() {
   // Filtrering af elever til matrixen
   const filtreredeElever = elever.filter((e) => {
     if (filterNiveau !== 'Alle' && e.niveau !== filterNiveau) return false;
-    if (filterStatus === 'Mangler' && e.oensker.length === 3) return false;
-    if (filterStatus === 'Klar' && e.oensker.length < 3) return false;
+    if (filterStatus === 'Partaftale' && !e.harPartaftale) return false;
+    if (filterStatus === 'Mangler' && (e.harPartaftale || e.oensker.length > 0)) return false;
+    if (filterStatus === 'Delvist' && (e.harPartaftale || e.oensker.length === 0 || e.oensker.length === 3)) return false;
+    if (filterStatus === 'Klar' && (e.harPartaftale || e.oensker.length < 3)) return false;
     if (soeg.trim() && !e.rytterNavnKort.toLowerCase().includes(soeg.toLowerCase())) return false;
     return true;
   });
 
   // Gruppér elever pr. niveau
-  const niveauer = ['Begynder', 'Letøvet', 'Øvet'];
+  const niveauer = ['Trækhold', 'Begynder', 'Letøvet', 'Øvet', 'Parthold'];
   const eleverPrNiveau = niveauer.map((niv) => ({
     niveau: niv,
     elever: filtreredeElever.filter((e) => e.niveau === niv),
@@ -350,11 +407,14 @@ export function OenskerLektionSide() {
     });
   }
 
-  // Statistik
+  // Statistik (elever med partaftale tælles særskilt og ekskluderes fra 'Mangler')
   const totalElever = elever.length;
-  const antalKlar = elever.filter((e) => e.oensker.length === 3).length;
-  const antalMangler = totalElever - antalKlar;
-  const procentKlar = totalElever > 0 ? Math.round((antalKlar / totalElever) * 100) : 0;
+  const eleverUdenPart = elever.filter((e) => !e.harPartaftale);
+  const antalPart = elever.filter((e) => e.harPartaftale).length;
+  const antalKlar = eleverUdenPart.filter((e) => e.oensker.length === 3).length;
+  const antalDelvist = eleverUdenPart.filter((e) => e.oensker.length > 0 && e.oensker.length < 3).length;
+  const antalMangler = eleverUdenPart.filter((e) => e.oensker.length === 0).length;
+  const procentKlar = eleverUdenPart.length > 0 ? Math.round((antalKlar / eleverUdenPart.length) * 100) : 0;
 
   if (indlaeser) {
     return (
@@ -417,16 +477,40 @@ export function OenskerLektionSide() {
           >
             Alle ({totalElever})
           </button>
+          {antalPart > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilterStatus('Partaftale')}
+              className={`min-h-[48px] px-4 rounded-xl text-xs sm:text-sm font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                filterStatus === 'Partaftale'
+                  ? 'bg-blue-600 text-white border-blue-500 shadow'
+                  : 'bg-blue-950/40 text-blue-300 border-blue-800/80 hover:bg-blue-950/60'
+              }`}
+            >
+              <span>Partaftale ({antalPart})</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setFilterStatus('Mangler')}
             className={`min-h-[48px] px-4 rounded-xl text-xs sm:text-sm font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
               filterStatus === 'Mangler'
+                ? 'bg-rose-600 text-white border-rose-500 shadow'
+                : 'bg-rose-950/40 text-rose-300 border-rose-800/80 hover:bg-rose-950/60'
+            }`}
+          >
+            <span>⛔ Mangler ({antalMangler})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterStatus('Delvist')}
+            className={`min-h-[48px] px-4 rounded-xl text-xs sm:text-sm font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
+              filterStatus === 'Delvist'
                 ? 'bg-amber-600 text-white border-amber-500 shadow'
                 : 'bg-amber-950/40 text-amber-300 border-amber-800/80 hover:bg-amber-950/60'
             }`}
           >
-            <span>⚠️ Mangler ({antalMangler})</span>
+            <span>⚠️ Mangler delvist ({antalDelvist})</span>
           </button>
           <button
             type="button"
@@ -484,9 +568,10 @@ export function OenskerLektionSide() {
       {/* MATRIX GRUPPERET EFTER NIVEAU */}
       <div className="space-y-8">
         {eleverPrNiveau.map(({ niveau, elever: niveauElever }) => {
-          if (niveauElever.length === 0 && filterNiveau === 'Alle') return null;
+          if (filterNiveau !== 'Alle' && niveau !== filterNiveau) return null;
+          if (niveauElever.length === 0) return null;
 
-          const klarCount = niveauElever.filter((e) => e.oensker.length === 3).length;
+          const klarCount = niveauElever.filter((e) => !e.harPartaftale && e.oensker.length === 3).length;
 
           return (
             <section key={niveau} className="space-y-3">
@@ -502,69 +587,107 @@ export function OenskerLektionSide() {
                 </span>
               </div>
 
-              {niveauElever.length === 0 ? (
-                <p className="text-slate-500 text-sm italic py-2">Ingen elever matcher søgekriterierne.</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
-                  {niveauElever.map((elev) => {
-                    const harTreOensker = elev.oensker.length === 3;
-                    const oenskeNavne = elev.oensker
-                      .map((id, idx) => `${idx + 1}. ${hesteMap.get(id)?.navn ?? 'Hest'}`)
-                      .join(' • ');
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                {niveauElever.map((elev) => {
+                  const erPart = !!elev.harPartaftale;
+                  const harTreOensker = elev.oensker.length === 3;
+                  const harDelvistOensker = elev.oensker.length > 0 && elev.oensker.length < 3;
 
-                    return (
-                      <button
-                        key={elev.rytterId}
-                        type="button"
-                        onClick={() => aabnRedigering(elev)}
-                        className={`text-left rounded-2xl border p-4 flex flex-col justify-between gap-3 transition-all active:scale-[0.98] cursor-pointer shadow-md ${
-                          harTreOensker
-                            ? 'bg-emerald-950/40 hover:bg-emerald-950/60 border-emerald-500/80 ring-1 ring-emerald-500/30'
-                            : 'bg-amber-950/40 hover:bg-amber-950/60 border-amber-500/80 ring-1 ring-amber-500/30'
-                        }`}
-                      >
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-bold text-lg text-white truncate">
-                              {elev.rytterNavnKort}
+                  return (
+                    <button
+                      key={elev.rytterId}
+                      type="button"
+                      onClick={() => aabnRedigering(elev)}
+                      className={`text-left rounded-2xl border p-4 flex flex-col justify-between gap-3 transition-all active:scale-[0.98] cursor-pointer shadow-md ${
+                        erPart
+                          ? 'bg-blue-950/40 hover:bg-blue-950/60 border-blue-500/80 ring-1 ring-blue-500/30'
+                          : harTreOensker
+                          ? 'bg-emerald-950/40 hover:bg-emerald-950/60 border-emerald-500/80 ring-1 ring-emerald-500/30'
+                          : harDelvistOensker
+                          ? 'bg-amber-950/40 hover:bg-amber-950/60 border-amber-500/80 ring-1 ring-amber-500/30'
+                          : 'bg-rose-950/40 hover:bg-rose-950/60 border-rose-500/80 ring-1 ring-rose-500/30'
+                      }`}
+                    >
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-lg text-white truncate">
+                            {elev.rytterNavnKort}
+                          </span>
+                          {erPart ? (
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-900/90 text-blue-300 border border-blue-700 shrink-0">
+                              Partaftale
                             </span>
-                            {harTreOensker ? (
-                              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-900/90 text-emerald-300 border border-emerald-700 shrink-0">
-                                ✓ 3/3 ønsker
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-900/90 text-amber-300 border border-amber-700 shrink-0">
-                                ⚠️ Mangler ({elev.oensker.length}/3)
+                          ) : harTreOensker ? (
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-900/90 text-emerald-300 border border-emerald-700 shrink-0">
+                              ✓ 3/3 klar
+                            </span>
+                          ) : harDelvistOensker ? (
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-900/90 text-amber-300 border border-amber-700 shrink-0">
+                              ⚠️ Delvist ({elev.oensker.length}/3)
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-900/90 text-rose-300 border border-rose-700 shrink-0">
+                              ⛔ Mangler (0/3)
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="text-xs text-slate-400">
+                          {elev.holdnavn}
+                        </div>
+                      </div>
+
+                      <div className="pt-2.5 border-t border-slate-800/80">
+                        {erPart ? (
+                          <div className="text-xs text-blue-300 font-medium truncate">
+                            Fast hest: {elev.partaftaleHestId ? (hesteMap.get(elev.partaftaleHestId)?.navn ?? 'Parthest') : 'Partaftale'}
+                          </div>
+                        ) : elev.oensker.length === 0 ? (
+                          <div className="text-xs text-rose-300/80 italic flex items-center justify-between">
+                            <span>Tryk for at vælge heste</span>
+                            <span>+</span>
+                          </div>
+                        ) : (
+                          <div className="text-xs font-medium flex flex-wrap items-center gap-1.5">
+                            {elev.oensker.map((id, idx) => {
+                              const h = hesteMap.get(id);
+                              const egnethed = h ? evaluerHestEgnethed(h, elev) : { egnet: true };
+                              const advarsel = !egnethed.egnet ? egnethed.aarsag : null;
+                              return (
+                                <span
+                                  key={id}
+                                  className={`inline-flex items-center gap-0.5 ${
+                                    harTreOensker ? 'text-emerald-300' : 'text-amber-300'
+                                  }`}
+                                >
+                                  <span>
+                                    {idx + 1}. {h?.navn ?? 'Hest'}
+                                  </span>
+                                  {advarsel && (
+                                    <span
+                                      className="text-amber-400 font-bold cursor-help"
+                                      title={`⚠️ ${advarsel}`}
+                                      aria-label={advarsel}
+                                    >
+                                      ⚠️
+                                    </span>
+                                  )}
+                                  {idx < elev.oensker.length - 1 && <span className="text-slate-500">•</span>}
+                                </span>
+                              );
+                            })}
+                            {!harTreOensker && (
+                              <span className="text-amber-400/80 text-[11px] ml-0.5">
+                                (mangler {3 - elev.oensker.length})
                               </span>
                             )}
                           </div>
-
-                          <div className="text-xs text-slate-400">
-                            {elev.holdnavn}
-                          </div>
-                        </div>
-
-                        <div className="pt-2.5 border-t border-slate-800/80">
-                          {harTreOensker ? (
-                            <div className="text-xs text-emerald-300 font-medium truncate" title={oenskeNavne}>
-                              {oenskeNavne}
-                            </div>
-                          ) : elev.oensker.length > 0 ? (
-                            <div className="text-xs text-amber-300/90 font-medium truncate" title={oenskeNavne}>
-                              {oenskeNavne} (mangler {3 - elev.oensker.length})
-                            </div>
-                          ) : (
-                            <div className="text-xs text-amber-400/80 italic flex items-center justify-between">
-                              <span>Tryk for at vælge heste</span>
-                              <span>+</span>
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </section>
           );
         })}
@@ -738,7 +861,7 @@ export function OenskerLektionSide() {
                               </span>
                               {redigerElev.niveau !== 'Begynder' && erBegynder && (
                                 <span className="text-[10px] text-amber-400/90 block mt-0.5">
-                                  💡 Forbeholdt begynderhold ved kabale
+                                  💡Forbeholdt begynderhold
                                 </span>
                               )}
                             </div>
@@ -836,7 +959,7 @@ export function OenskerLektionSide() {
                                 className="text-[10px] text-amber-400 font-semibold truncate block"
                                 title={aarsag}
                               >
-                                ⚠️ {aarsag ?? 'Ikke godkendt'}
+                                {aarsag?.startsWith('⚠️') ? aarsag : `⚠️ ${aarsag ?? 'Ikke godkendt'}`}
                               </span>
                             </div>
                           </div>

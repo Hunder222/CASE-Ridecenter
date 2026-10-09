@@ -115,7 +115,27 @@ function useStatusskift<T>(handling: 'godkend' | 'publicer') {
   });
 }
 
-export const useGodkend = () => useStatusskift<Tildelingskoersel>('godkend');
+export function useGodkend() {
+  const queryKlient = useQueryClient();
+  return useMutation({
+    mutationFn: (param: string | { id: string; tilladNiveauDispensation?: boolean }) => {
+      const id = typeof param === 'string' ? param : param.id;
+      const body = typeof param === 'object' && param.tilladNiveauDispensation
+        ? { tillad_niveau_dispensation: true }
+        : {};
+      return api<Tildelingskoersel>(`/tildeling/koersler/${id}/godkend`, {
+        metode: 'POST',
+        body,
+      });
+    },
+    onSuccess: (_svar, param) => {
+      const id = typeof param === 'string' ? param : param.id;
+      void queryKlient.invalidateQueries({ queryKey: kabaleNoegler.koersel(id) });
+      void queryKlient.invalidateQueries({ queryKey: ['koersler'] });
+    },
+  });
+}
+
 export const usePublicer = () => useStatusskift<PubliceringSvar>('publicer');
 
 export function useNotifikationer(aktiv = true) {

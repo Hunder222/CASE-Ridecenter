@@ -93,12 +93,13 @@ export function IDagSide() {
     tjekRolle();
   }, [iDagStr]);
 
-  // Månedskalender og programnavigation
+  // Holdkalender modal og programnavigation
   const [kalenderData, setKalenderData] = useState<Record<string, number>>({});
   const [visKalenderModal, setVisKalenderModal] = useState(false);
-  const [kalenderMaaned, setKalenderMaaned] = useState<string>(valgtDato.slice(0, 7));
+  const [modalMaaned, setModalMaaned] = useState<string>(valgtDato.slice(0, 7));
+  const [modalKalenderData, setModalKalenderData] = useState<Record<string, number>>({});
 
-  const hentKalenderOversigt = async (maanedStr: string) => {
+  const hentKalenderForMaaned = async (maanedStr: string): Promise<Record<string, number>> => {
     try {
       const enhedNoegle = localStorage.getItem('ridecenter_enhedsnoegle') ?? 'demo-enhedsnoegle-stald-tablet-1';
       const res = await fetch(`/api/v1/stald/kalender/${maanedStr}`, {
@@ -110,8 +111,7 @@ export function IDagSide() {
         for (const item of data) {
           map[item.dato] = item.antalLektioner;
         }
-        setKalenderData(map);
-        return;
+        return map;
       }
     } catch {}
 
@@ -123,13 +123,35 @@ export function IDagSide() {
           map[l.dato] = (map[l.dato] ?? 0) + 1;
         }
       }
-      setKalenderData(map);
-    } catch {}
+      return map;
+    } catch {
+      return {};
+    }
   };
 
+  // Aktiv program-måned henter kalenderData baseret på valgtDato
+  const aktivMaanedStr = valgtDato.slice(0, 7);
   useEffect(() => {
-    hentKalenderOversigt(kalenderMaaned);
-  }, [kalenderMaaned]);
+    let afbrudt = false;
+    hentKalenderForMaaned(aktivMaanedStr).then((res) => {
+      if (!afbrudt) setKalenderData(res);
+    });
+    return () => {
+      afbrudt = true;
+    };
+  }, [aktivMaanedStr]);
+
+  // Modal henter modalKalenderData baseret på modalMaaned
+  useEffect(() => {
+    if (!visKalenderModal) return;
+    let afbrudt = false;
+    hentKalenderForMaaned(modalMaaned).then((res) => {
+      if (!afbrudt) setModalKalenderData(res);
+    });
+    return () => {
+      afbrudt = true;
+    };
+  }, [modalMaaned, visKalenderModal]);
 
   const programDatoer = Object.keys(kalenderData).sort();
   const forrigeProgramDato = [...programDatoer].reverse().find((d) => d < valgtDato);
@@ -152,7 +174,7 @@ export function IDagSide() {
   };
 
   const kalenderDage = (() => {
-    const [aarStr = '2026', mdStr = '1'] = kalenderMaaned.split('-');
+    const [aarStr = '2026', mdStr = '1'] = modalMaaned.split('-');
     const aar = parseInt(aarStr, 10);
     const md = parseInt(mdStr, 10);
     const foersteDato = new Date(aar, md - 1, 1);
@@ -169,7 +191,7 @@ export function IDagSide() {
     const pad = (n: number) => String(n).padStart(2, '0');
     for (let dag = 1; dag <= sidsteDag; dag++) {
       const dStr = `${aar}-${pad(md)}-${pad(dag)}`;
-      const antalHold = kalenderData[dStr] ?? 0;
+      const antalHold = modalKalenderData[dStr] ?? 0;
       celler.push({ dag, datoStr: dStr, antalHold });
     }
 
@@ -391,12 +413,15 @@ export function IDagSide() {
             {!erVikar && (
               <button
                 type="button"
-                onClick={() => setVisKalenderModal(true)}
+                onClick={() => {
+                  setModalMaaned(valgtDato.slice(0, 7));
+                  setVisKalenderModal(true);
+                }}
                 className="min-h-[48px] px-4 rounded-xl bg-sky-950 hover:bg-sky-900 text-sky-200 border border-sky-700/80 font-bold text-sm flex items-center gap-2 transition cursor-pointer shadow-sm active:scale-95"
-                title="Åbn månedskalender"
+                title="Åbn holdkalender"
               >
                 <span>📅</span>
-                <span>Månedskalender</span>
+                <span>Holdkalender</span>
               </button>
             )}
 
@@ -426,7 +451,7 @@ export function IDagSide() {
             </h3>
             <p className="text-slate-400 text-sm mt-1 max-w-md mx-auto">
               {erIDag
-                ? 'Der er ikke planlagt undervisning i dag. Se næste program eller brug månedskalenderen.'
+                ? 'Der er ikke planlagt undervisning i dag. Se næste program eller brug holdkalenderen.'
                 : 'Der er ingen registrerede hold på denne dato.'}
             </p>
           </div>
@@ -444,10 +469,13 @@ export function IDagSide() {
             )}
             <button
               type="button"
-              onClick={() => setVisKalenderModal(true)}
-              className="min-h-[44px] px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm border border-slate-700 transition cursor-pointer"
+              onClick={() => {
+                setModalMaaned(valgtDato.slice(0, 7));
+                setVisKalenderModal(true);
+              }}
+              className="min-h-[44px] px-4 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 font-semibold text-sm border border-slate-700 transition cursor-pointer"
             >
-              📅 Vælg fra månedskalender
+              📅 Vælg fra holdkalender
             </button>
           </div>
         </div>
@@ -546,18 +574,18 @@ export function IDagSide() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setKalenderMaaned((m) => forskydMaanedStreng(m, -1))}
+                  onClick={() => setModalMaaned((m) => forskydMaanedStreng(m, -1))}
                   className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center font-bold cursor-pointer"
                   title="Forrige måned"
                 >
                   ←
                 </button>
                 <h3 className="text-xl font-bold text-white px-2">
-                  {formaterMaanedDansk(kalenderMaaned)}
+                  {formaterMaanedDansk(modalMaaned)}
                 </h3>
                 <button
                   type="button"
-                  onClick={() => setKalenderMaaned((m) => forskydMaanedStreng(m, 1))}
+                  onClick={() => setModalMaaned((m) => forskydMaanedStreng(m, 1))}
                   className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center font-bold cursor-pointer"
                   title="Næste måned"
                 >

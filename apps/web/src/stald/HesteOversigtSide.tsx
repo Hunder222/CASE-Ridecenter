@@ -8,9 +8,11 @@ export const HesteOversigtSide: React.FC = () => {
   const [heste, setHeste] = useState<LokalHest[]>([]);
   const [valgtHest, setValgtHest] = useState<LokalHest | null>(null);
   const [type, setType] = useState<'Helbred' | 'Adfaerd'>('Helbred');
-  const [alvorlighed, setAlvorlighed] = useState<'Info' | 'Obs' | 'KanIkkeBruges'>('Obs');
+  const [alvorlighed, setAlvorlighed] = useState<
+    'Info' | 'Obs' | 'KanIkkeBruges' | 'Sygemeldt' | 'Skadet' | 'Karantaene' | 'Raskmeldt'
+  >('Obs');
   const [beskrivelse, setBeskrivelse] = useState<string>('');
-  const [filterStatus, setFilterStatus] = useState<'Alle' | 'Aktiv' | 'Sygemeldt' | 'Skadet'>('Alle');
+  const [filterStatus, setFilterStatus] = useState<'Alle' | 'Aktiv' | 'Sygemeldt' | 'Skadet' | 'Karantaene'>('Alle');
   const [fejl, setFejl] = useState<string | null>(null);
   const [gemmer, setGemmer] = useState(false);
   const [kanRedigereNoter, setKanRedigereNoter] = useState(false);
@@ -113,6 +115,14 @@ export const HesteOversigtSide: React.FC = () => {
     setFejl(null);
   };
 
+  const aabnRaskmeldModal = (hest: LokalHest) => {
+    setValgtHest(hest);
+    setType('Helbred');
+    setAlvorlighed('Raskmeldt');
+    setBeskrivelse('Hesten er meldt rask og klar til undervisning');
+    setFejl(null);
+  };
+
   const lukModal = () => {
     setValgtHest(null);
     setBeskrivelse('');
@@ -174,6 +184,13 @@ export const HesteOversigtSide: React.FC = () => {
             Skadet
           </span>
         );
+      case 'Karantaene':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-950/80 text-purple-300 border border-purple-700/80">
+            <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+            Karantæne
+          </span>
+        );
       default:
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700">
@@ -186,11 +203,117 @@ export const HesteOversigtSide: React.FC = () => {
   const antalAktive = heste.filter((h) => h.sundhedsstatus === 'Aktiv').length;
   const antalSyge = heste.filter((h) => h.sundhedsstatus === 'Sygemeldt').length;
   const antalSkadede = heste.filter((h) => h.sundhedsstatus === 'Skadet').length;
+  const antalKarantaene = heste.filter((h) => h.sundhedsstatus === 'Karantaene').length;
 
   const filtreredeHeste = heste.filter((h) => {
     if (filterStatus === 'Alle') return true;
     return h.sundhedsstatus === filterStatus;
   });
+
+  const DYNAMISKE_FORSLAG: Record<string, string[]> = {
+    'Helbred:Skadet': [
+      'Halter svagt på venstre forben',
+      'Tydeligt halt i trav',
+      'Tabt forsko / mangler sko',
+      'Løs sko',
+      'Sår på piben / kodeled',
+      'Hævelse i seneskede',
+      'Trådt på søm / sten',
+      'Forvredet kodeled på fold',
+      'Øm ryg ved berøring',
+      'Gnavsår efter sadel/gjord',
+    ],
+    'Helbred:Sygemeldt': [
+      'Feber (målt over 38.3°C)',
+      'Hoste og næseflåd',
+      'Koliksymptomer / skraber med ben',
+      'Mat og vil ikke spise foder',
+      'Diarré / dårlig mave',
+      'Øjenbetændelse / hævet øje',
+      'Slap og træt under strigling',
+    ],
+    'Helbred:KanIkkeBruges': [
+      'Feber (målt over 38.3°C)',
+      'Hoste og næseflåd',
+      'Koliksymptomer / skraber med ben',
+      'Mat og vil ikke spise foder',
+      'Akut ubehag / smertepåvirket',
+    ],
+    'Helbred:Karantaene': [
+      'Mistanke om smitsom kværke',
+      'Høj feber og hævede kirtler',
+      'Isoleret i karantæneboks',
+      'Afventer dyrlægepodning',
+      'Må ikke forlade boks / staldafsnit',
+    ],
+    'Helbred:Obs': [
+      'Let stiv i starten af lektion',
+      'Lidt hoste i starten (støv)',
+      'Hold øje med venstre bagben',
+      'Mindre hudafskrabning (rengjort)',
+      'Spiser langsomt i dag',
+      'Varme i kodeled',
+    ],
+    'Helbred:Info': [
+      'Fik smed i formiddags',
+      'Vaccineret i dag',
+      'Foder justeret',
+      'Tjekket af hestemassør',
+      'Ormekur givet',
+    ],
+    'Helbred:Raskmeldt': [
+      'Godkendt af dyrlæge',
+      'Godkendt af beslagsmed',
+      'Haltfri og frisk i alle gangarter',
+      'Feberfri og normal appetit',
+      'Sår helet og tørt',
+      'Klar til fuld undervisning',
+    ],
+    'Adfaerd:Obs': [
+      'Meget urolig i boks',
+      'Stresset ved opsadling / gjordkrampe',
+      'Napper eller bider efter strigler',
+      'Løfter ben / truer med bagben',
+      'Bange for lyde i ridehus',
+      'Urolig ved opstigning',
+    ],
+    'Adfaerd:Info': [
+      'Mindre nervøs end i går',
+      'Godt samarbejde på fold',
+      'Rolig under strigling',
+      'Gik pænt med ny elev',
+    ],
+    'Adfaerd:Sygemeldt': [
+      'Bukker gentagne gange under rytter',
+      'Stejler ved opstigning / lektion',
+      'Løber løbsk i ridehuset',
+      'Meget aggressiv over for andre heste',
+      'Vurderet usikker for elev i dag',
+    ],
+    'Adfaerd:KanIkkeBruges': [
+      'Bukker gentagne gange under rytter',
+      'Stejler ved opstigning / lektion',
+      'Løber løbsk i ridehuset',
+      'Meget aggressiv over for andre heste',
+      'Vurderet usikker for elev i dag',
+    ],
+    'Adfaerd:Raskmeldt': [
+      'Rolig og afbalanceret efter træning',
+      'Fint samarbejde under opsadling',
+      'Godkendt til holdlektioner igen',
+    ],
+  };
+
+  const aktuelleForslag =
+    DYNAMISKE_FORSLAG[`${type}:${alvorlighed}`] ??
+    DYNAMISKE_FORSLAG[`${type}:Obs`] ?? [
+      'Halter svagt',
+      'Tydeligt halt',
+      'Mangler/tabt sko',
+      'Hoste/feber',
+      'Urolig i boks',
+      'Raskmeldt og klar',
+    ];
 
   return (
     <div className="space-y-6">
@@ -207,14 +330,14 @@ export const HesteOversigtSide: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white">Staldens Heste</h1>
             <p className="text-sm text-slate-400 mt-0.5">
-              Overblik over hestenes sundhedstilstand og hurtig registrering af helbred/adfærd (fail-safe).
+              Overblik over hestenes sundhedstilstand og hurtig registrering af helbred, skader og karantæne (fail-safe).
             </p>
           </div>
         </div>
       </div>
 
       {/* KPI Overbliksbjælke */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <button
           type="button"
           onClick={() => setFilterStatus('Alle')}
@@ -279,6 +402,23 @@ export const HesteOversigtSide: React.FC = () => {
           <div className="text-2xl font-bold text-amber-300 mt-1">{antalSkadede}</div>
           <span className="text-[11px] text-amber-400/80 mt-0.5">Kræver opmærksomhed</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterStatus(filterStatus === 'Karantaene' ? 'Alle' : 'Karantaene')}
+          className={`p-4 rounded-2xl border text-left transition cursor-pointer flex flex-col justify-between ${
+            filterStatus === 'Karantaene'
+              ? 'bg-purple-950/80 border-purple-500 ring-2 ring-purple-400/50 shadow-lg'
+              : 'bg-purple-950/30 border-purple-900/60 hover:border-purple-800'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-purple-400">🟣 Karantæne</span>
+            <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+          </div>
+          <div className="text-2xl font-bold text-purple-300 mt-1">{antalKarantaene}</div>
+          <span className="text-[11px] text-purple-400/80 mt-0.5">Isoleret fra stalden</span>
+        </button>
       </div>
 
       {/* Grid med touch-kort (mindst 56px touch felter) */}
@@ -291,6 +431,8 @@ export const HesteOversigtSide: React.FC = () => {
                 ? 'bg-rose-950/20 border-rose-900/60'
                 : hest.sundhedsstatus === 'Skadet'
                 ? 'bg-amber-950/20 border-amber-900/60'
+                : hest.sundhedsstatus === 'Karantaene'
+                ? 'bg-purple-950/20 border-purple-900/60'
                 : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
             }`}
           >
@@ -334,6 +476,15 @@ export const HesteOversigtSide: React.FC = () => {
                   <span>📝</span> Redigér oplysninger
                 </button>
               )}
+              {hest.sundhedsstatus !== 'Aktiv' && (
+                <button
+                  type="button"
+                  onClick={() => aabnRaskmeldModal(hest)}
+                  className="min-h-[52px] px-3.5 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <span>🟢</span> Meld rask
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => aabnStatusModal(hest)}
@@ -353,7 +504,7 @@ export const HesteOversigtSide: React.FC = () => {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
         >
-          <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl text-slate-100 space-y-5">
+          <div className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-2xl bg-slate-900 border border-slate-800 p-5 sm:p-6 shadow-2xl text-slate-100 space-y-4">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-xl font-bold text-white">Meld status for {valgtHest.navn}</h2>
@@ -376,17 +527,17 @@ export const HesteOversigtSide: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={haandterIndsendStatus} className="space-y-4">
+            <form onSubmit={haandterIndsendStatus} className="space-y-3.5">
               {/* Type vælger */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
                   Type melding
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setType('Helbred')}
-                    className={`min-h-[56px] rounded-xl font-medium text-sm transition border ${
+                    className={`min-h-[48px] rounded-xl font-medium text-sm transition border ${
                       type === 'Helbred'
                         ? 'bg-sky-600 text-white border-sky-500 shadow-md ring-2 ring-sky-400/30'
                         : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
@@ -396,8 +547,13 @@ export const HesteOversigtSide: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setType('Adfaerd')}
-                    className={`min-h-[56px] rounded-xl font-medium text-sm transition border ${
+                    onClick={() => {
+                      setType('Adfaerd');
+                      if (alvorlighed === 'Skadet' || alvorlighed === 'Karantaene') {
+                        setAlvorlighed('Obs');
+                      }
+                    }}
+                    className={`min-h-[48px] rounded-xl font-medium text-sm transition border ${
                       type === 'Adfaerd'
                         ? 'bg-sky-600 text-white border-sky-500 shadow-md ring-2 ring-sky-400/30'
                         : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
@@ -410,47 +566,150 @@ export const HesteOversigtSide: React.FC = () => {
 
               {/* Alvorlighed */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                  Alvorlighed
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                  Alvorlighed / Status
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setAlvorlighed('Info')}
-                    className={`min-h-[56px] rounded-xl font-medium text-sm transition border ${
-                      alvorlighed === 'Info'
-                        ? 'bg-slate-700 text-white border-slate-500 ring-2 ring-slate-400/30'
-                        : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
-                    }`}
-                  >
-                    ℹ️ Info
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAlvorlighed('Obs')}
-                    className={`min-h-[56px] rounded-xl font-medium text-sm transition border ${
-                      alvorlighed === 'Obs'
-                        ? 'bg-amber-600 text-white border-amber-500 ring-2 ring-amber-400/30'
-                        : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
-                    }`}
-                  >
-                    ⚠️ Obs
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAlvorlighed('KanIkkeBruges')}
-                    className={`min-h-[56px] rounded-xl font-medium text-sm transition border ${
-                      alvorlighed === 'KanIkkeBruges'
-                        ? 'bg-rose-600 text-white border-rose-500 ring-2 ring-rose-400/30'
-                        : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
-                    }`}
-                  >
-                    🚫 Kan ikke bruges
-                  </button>
-                </div>
-                {alvorlighed === 'KanIkkeBruges' && (
-                  <p className="text-xs text-rose-300 mt-2 bg-rose-950/40 p-2 rounded-lg border border-rose-900/60">
-                    ⚠️ Bemærk: &apos;Kan ikke bruges&apos; sygemelder straks hesten, så den ikke kan tildeles eller rides på i dag.
+                {type === 'Helbred' ? (
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAlvorlighed('Obs')}
+                      className={`min-h-[46px] rounded-xl font-medium text-xs sm:text-sm transition border ${
+                        alvorlighed === 'Obs'
+                          ? 'bg-amber-600 text-white border-amber-500 ring-2 ring-amber-400/30'
+                          : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      ⚠️ Obs (aktiv)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAlvorlighed('Sygemeldt')}
+                      className={`min-h-[46px] rounded-xl font-medium text-xs sm:text-sm transition border ${
+                        alvorlighed === 'Sygemeldt' || alvorlighed === 'KanIkkeBruges'
+                          ? 'bg-rose-600 text-white border-rose-500 ring-2 ring-rose-400/30'
+                          : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      🔴 Sygemeldt
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAlvorlighed('Skadet')}
+                      className={`min-h-[46px] rounded-xl font-medium text-xs sm:text-sm transition border ${
+                        alvorlighed === 'Skadet'
+                          ? 'bg-amber-700 text-white border-amber-500 ring-2 ring-amber-400/30'
+                          : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      🟠 Skadet
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAlvorlighed('Karantaene')}
+                      className={`min-h-[46px] rounded-xl font-medium text-xs sm:text-sm transition border ${
+                        alvorlighed === 'Karantaene'
+                          ? 'bg-purple-700 text-white border-purple-500 ring-2 ring-purple-400/30'
+                          : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      🟣 Karantæne
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAlvorlighed('Info')}
+                      className={`min-h-[46px] rounded-xl font-medium text-xs sm:text-sm transition border ${
+                        alvorlighed === 'Info'
+                          ? 'bg-slate-700 text-white border-slate-500 ring-2 ring-slate-400/30'
+                          : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      ℹ️ Info
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAlvorlighed('Raskmeldt')}
+                      className={`min-h-[46px] rounded-xl font-medium text-xs sm:text-sm transition border ${
+                        alvorlighed === 'Raskmeldt'
+                          ? 'bg-emerald-600 text-white border-emerald-500 ring-2 ring-emerald-400/30'
+                          : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      🟢 Meld rask
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAlvorlighed('Obs')}
+                      className={`min-h-[46px] rounded-xl font-medium text-xs sm:text-sm transition border ${
+                        alvorlighed === 'Obs'
+                          ? 'bg-amber-600 text-white border-amber-500 ring-2 ring-amber-400/30'
+                          : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      ⚠️ Obs
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAlvorlighed('KanIkkeBruges')}
+                      className={`min-h-[46px] rounded-xl font-medium text-xs sm:text-sm transition border ${
+                        alvorlighed === 'KanIkkeBruges' || alvorlighed === 'Sygemeldt'
+                          ? 'bg-rose-600 text-white border-rose-500 ring-2 ring-rose-400/30'
+                          : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      🚫 Kan ikke bruges
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAlvorlighed('Info')}
+                      className={`min-h-[46px] rounded-xl font-medium text-xs sm:text-sm transition border ${
+                        alvorlighed === 'Info'
+                          ? 'bg-slate-700 text-white border-slate-500 ring-2 ring-slate-400/30'
+                          : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      ℹ️ Info
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAlvorlighed('Raskmeldt')}
+                      className={`min-h-[46px] rounded-xl font-medium text-xs sm:text-sm transition border ${
+                        alvorlighed === 'Raskmeldt'
+                          ? 'bg-emerald-600 text-white border-emerald-500 ring-2 ring-emerald-400/30'
+                          : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-750'
+                      }`}
+                    >
+                      🟢 Meld klar
+                    </button>
+                  </div>
+                )}
+
+                {(alvorlighed === 'KanIkkeBruges' || alvorlighed === 'Sygemeldt') && (
+                  <p className="text-xs text-rose-300 mt-2 bg-rose-950/40 p-2.5 rounded-lg border border-rose-900/60 leading-relaxed">
+                    ⚠️ Bemærk: Sygemelder straks hesten, så den ikke kan tildeles eller rides på, indtil den er meldt rask.
+                  </p>
+                )}
+                {alvorlighed === 'Skadet' && (
+                  <p className="text-xs text-amber-300 mt-2 bg-amber-950/40 p-2.5 rounded-lg border border-amber-900/60 leading-relaxed">
+                    🟠 Bemærk: Registrerer hesten som skadet. Hesten tages ud af drift, indtil den er meldt rask.
+                  </p>
+                )}
+                {alvorlighed === 'Karantaene' && (
+                  <p className="text-xs text-purple-300 mt-2 bg-purple-950/40 p-2.5 rounded-lg border border-purple-900/60 leading-relaxed">
+                    🟣 Bemærk: Sætter hesten i karantæne (isolationsprotokol). Hesten tages omgående ud af drift for at forhindre smittespredning.
+                  </p>
+                )}
+                {alvorlighed === 'Obs' && (
+                  <p className="text-xs text-amber-300 mt-2 bg-amber-950/40 p-2.5 rounded-lg border border-amber-900/60 leading-relaxed">
+                    ⚠️ Bemærk: Hesten forbliver aktiv og kan rides, men stald og undervisere adviseres om observationen.
+                  </p>
+                )}
+                {alvorlighed === 'Raskmeldt' && (
+                  <p className="text-xs text-emerald-300 mt-2 bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-900/60 leading-relaxed">
+                    🟢 Bemærk: &apos;Meld rask&apos; sætter straks hestens sundhedsstatus tilbage til &apos;Aktiv&apos;, så den igen er klar til undervisning.
                   </p>
                 )}
               </div>
@@ -468,46 +727,74 @@ export const HesteOversigtSide: React.FC = () => {
                   value={beskrivelse}
                   onChange={(e) => setBeskrivelse(e.target.value)}
                   placeholder="F.eks. Halter svagt på venstre forben efter foldgang..."
-                  rows={3}
+                  rows={2}
                   maxLength={500}
-                  className="w-full rounded-xl bg-slate-950 border border-slate-700 p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full rounded-xl bg-slate-950 border border-slate-700 p-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
                 />
               </div>
 
-              {/* Hurtige knapper */}
-              <div className="flex flex-wrap gap-2 pt-1">
-                {['Halter svagt', 'Mangler sko', 'Hoste/feber', 'Meget urolig i boks', 'Sår/hævelse'].map((kvik) => (
-                  <button
-                    key={kvik}
-                    type="button"
-                    onClick={() => setBeskrivelse((prev) => (prev ? `${prev}. ${kvik}` : kvik))}
-                    className="min-h-[44px] px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700"
-                  >
-                    + {kvik}
-                  </button>
-                ))}
+              {/* Hurtige knapper i 2 rækker med horisontal scroll */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Hurtige forslag (2 rækker &middot; rul vandret)
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-medium">↔ Rul for flere</span>
+                </div>
+                <div className="grid grid-rows-2 grid-flow-col auto-cols-max gap-2 overflow-x-auto pb-2 pt-0.5 scroll-smooth">
+                  {aktuelleForslag.map((kvik) => (
+                    <button
+                      key={kvik}
+                      type="button"
+                      onClick={() => {
+                        setBeskrivelse((prev) => (prev ? `${prev}. ${kvik}` : kvik));
+                      }}
+                      className="min-h-[40px] px-3.5 py-1.5 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-750 active:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer whitespace-nowrap shadow-sm hover:border-slate-500"
+                    >
+                      + {kvik}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Handlingsknapper */}
-              <div className="flex items-center gap-3 pt-3">
+              <div className="flex items-center gap-3 pt-2">
                 <button
                   type="button"
                   onClick={lukModal}
                   disabled={gemmer}
-                  className="flex-1 min-h-[56px] rounded-xl font-medium text-sm bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 transition"
+                  className="flex-1 min-h-[50px] rounded-xl font-medium text-sm bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 transition"
                 >
                   Annuller
                 </button>
                 <button
                   type="submit"
                   disabled={gemmer}
-                  className={`flex-1 min-h-[56px] rounded-xl font-bold text-sm text-white transition flex items-center justify-center gap-2 ${
-                    alvorlighed === 'KanIkkeBruges'
+                  className={`flex-1 min-h-[50px] rounded-xl font-bold text-sm text-white transition flex items-center justify-center gap-2 ${
+                    alvorlighed === 'KanIkkeBruges' || alvorlighed === 'Sygemeldt'
                       ? 'bg-rose-600 hover:bg-rose-500'
+                      : alvorlighed === 'Skadet'
+                      ? 'bg-amber-600 hover:bg-amber-500'
+                      : alvorlighed === 'Karantaene'
+                      ? 'bg-purple-600 hover:bg-purple-500'
+                      : alvorlighed === 'Raskmeldt'
+                      ? 'bg-emerald-600 hover:bg-emerald-500'
                       : 'bg-sky-600 hover:bg-sky-500'
                   }`}
                 >
-                  {gemmer ? 'Gemmer...' : 'Indsend melding'}
+                  {gemmer
+                    ? 'Gemmer...'
+                    : alvorlighed === 'KanIkkeBruges' || alvorlighed === 'Sygemeldt'
+                    ? '🔴 Sygemeld hest'
+                    : alvorlighed === 'Skadet'
+                    ? '🟠 Registrér skade'
+                    : alvorlighed === 'Karantaene'
+                    ? '🟣 Sæt i karantæne'
+                    : alvorlighed === 'Raskmeldt'
+                    ? '🟢 Gem & raskmeld'
+                    : alvorlighed === 'Obs'
+                    ? '⚠️ Gem observation'
+                    : 'Indsend melding'}
                 </button>
               </div>
             </form>

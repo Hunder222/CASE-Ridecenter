@@ -124,7 +124,25 @@ export const Rytter = z.object({
   kontakt_telefon: z.string(),
   kontakt_email: z.string(),
   partaftale_hest_id: Uuid.nullable(),
+  /** Samlet liste over alle heste eleven har partaftale med (inklusive påkrævede heste) */
+  partaftale_hest_ids: z.array(Uuid).optional(),
+  /** Heste sat som påkrævet i sikkerhedsprofilen */
+  paakraevede_hest_ids: z.array(Uuid).optional(),
   partaftale_godkendt_trods_niveau: z.boolean(),
+  /** true hvis hesten er sat som påkrævet af hensyn til rytterens sikkerhedsprofil */
+  har_paakraevet_hest: z.boolean().optional(),
+  /** Navne på hold som rytteren aktuelt er tilmeldt */
+  hold_navne: z.array(z.string()).optional(),
+  /** Formaterede holdtyper f.eks. 'Letøvet spring', 'Trækhold', 'Parthold' */
+  hold_typer: z.array(z.string()).optional(),
+  /** Detaljerede informationer om tilmeldte hold */
+  hold_detaljer: z.array(z.object({
+    hold_id: Uuid,
+    holdnavn: z.string(),
+    niveau: Niveau,
+    er_springhold: z.boolean(),
+    ugedag: Ugedag,
+  })).optional(),
   aktiv_status: AktivStatus,
   slutdato: Dato.nullable(),
 });
@@ -144,6 +162,7 @@ export const RytterInput = z.strictObject({
   kontakt_telefon: z.string().trim().min(1, 'Telefon skal udfyldes'),
   kontakt_email: z.email('Ugyldig e-mail'),
   partaftale_hest_id: Uuid.nullable().default(null),
+  partaftale_hest_ids: z.array(Uuid).optional(),
   partaftale_godkendt_trods_niveau: z.boolean().default(false),
 });
 export type RytterInput = z.infer<typeof RytterInput>;
@@ -153,6 +172,7 @@ export const RytterOpdatering = RytterInput.extend({
   klar_til_udvikling: z.boolean(),
   er_hjaelper: z.boolean(),
   partaftale_hest_id: Uuid.nullable(),
+  partaftale_hest_ids: z.array(Uuid).optional(),
   partaftale_godkendt_trods_niveau: z.boolean(),
 }).partial();
 export type RytterOpdatering = z.infer<typeof RytterOpdatering>;

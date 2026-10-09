@@ -3,16 +3,51 @@ import { useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { forskydMaaned, maanedNavn, naesteMaaned } from '../../faelles/maaned';
 import { harRolle, useSession } from '../../faelles/session';
+import { ApiFejl } from '../../faelles/api-klient';
 import { Dialog } from '../../faelles/ui/Dialog';
 import { FejlBesked } from '../../faelles/ui/FejlBesked';
 import { Indlaeser } from '../../faelles/ui/Indlaeser';
 import { Knap } from '../../faelles/ui/Knap';
-import { useGodkend, useKoersel, useKoersler, useKoerTildeling, usePublicer, useSaertildelAlle } from '../api/kabale';
+import { useGodkend, useKandidater, useKoersel, useKoersler, useKoerTildeling, usePublicer, useSaertildelAlle } from '../api/kabale';
 import { useHeste, useHold, useOensker, useRyttere } from '../api/stamdata';
 import { BegrundelsePanel } from './BegrundelsePanel';
 import { HestVaelger } from './HestVaelger';
 import { HoldTabel } from './HoldTabel';
 import { KoerselOversigt } from './KoerselOversigt';
+
+function IkkeTildeltStatusBadge({
+  koerselId,
+  tildelingId,
+}: {
+  koerselId: string;
+  tildelingId: string;
+}) {
+  const { data: kandidater, isLoading } = useKandidater(koerselId, tildelingId);
+
+  if (isLoading) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600 border border-stone-200">
+        Beregner…
+      </span>
+    );
+  }
+
+  const harMulighed = kandidater?.some((k) => k.lovlig) ?? false;
+
+  if (harMulighed) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800 border border-amber-300">
+        🟡 Dispensation mulig
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-800 border border-rose-300">
+      🔴 Ingen dispensation mulig
+    </span>
+  );
+}
 
 function ElevoenskeStatistik({
   maaned,
@@ -26,6 +61,8 @@ function ElevoenskeStatistik({
 
   const stats = useMemo(() => {
     const aktiveRyttere = (ryttere.data ?? []).filter((r) => r.aktiv_status === 'Aktiv');
+    const partaftaleRyttere = aktiveRyttere.filter((r) => Boolean(r.partaftale_hest_id));
+    const oenskeRyttere = aktiveRyttere.filter((r) => !r.partaftale_hest_id);
     const oenskerListe = oensker.data ?? [];
 
     const prRytter = new Map<string, typeof oenskerListe>();
@@ -39,7 +76,7 @@ function ElevoenskeStatistik({
     let delvistUdfyldt = 0;
     let mangler = 0;
 
-    for (const r of aktiveRyttere) {
+    for (const r of oenskeRyttere) {
       const count = prRytter.get(r.id)?.length ?? 0;
       if (count >= 3) fuldtUdfyldt++;
       else if (count > 0) delvistUdfyldt++;
@@ -66,6 +103,8 @@ function ElevoenskeStatistik({
 
     return {
       totalAktive: aktiveRyttere.length,
+      antalPartaftale: partaftaleRyttere.length,
+      antalOenskeRyttere: oenskeRyttere.length,
       fuldtUdfyldt,
       delvistUdfyldt,
       mangler,
@@ -77,7 +116,7 @@ function ElevoenskeStatistik({
     return null;
   }
 
-  const pct = stats.totalAktive > 0 ? Math.round((stats.fuldtUdfyldt / stats.totalAktive) * 100) : 0;
+  const pct = stats.antalOenskeRyttere > 0 ? Math.round((stats.fuldtUdfyldt / stats.antalOenskeRyttere) * 100) : 0;
 
   return (
     <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
@@ -98,11 +137,16 @@ function ElevoenskeStatistik({
         </Link>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
         <div className="rounded-md bg-stone-50 p-2.5">
           <div className="text-xs font-medium text-stone-500">Aktive ryttere</div>
           <div className="mt-1 text-xl font-bold text-stone-800">{stats.totalAktive}</div>
           <div className="text-[11px] text-stone-500">i rideklubben</div>
+        </div>
+        <div className="rounded-md bg-sky-50 p-2.5">
+          <div className="text-xs font-medium text-sky-800">Partaftale</div>
+          <div className="mt-1 text-xl font-bold text-sky-700">{stats.antalPartaftale}</div>
+          <div className="text-[11px] text-sky-600">fast hest</div>
         </div>
         <div className="rounded-md bg-emerald-50 p-2.5">
           <div className="text-xs font-medium text-emerald-800">3 af 3 ønsker</div>
@@ -183,6 +227,26 @@ export function KabaleSide() {
   const [reserverBegynderHeste, setReserverBegynderHeste] = useState(false);
   const [reserverSpringHeste, setReserverSpringHeste] = useState(false);
   const [visIkkeTildeltModal, setVisIkkeTildeltModal] = useState(false);
+  const [bekraeftDispensation, setBekraeftDispensation] = useState(false);
+  const [bekraeftUfuldstaendigPublicering, setBekraeftUfuldstaendigPublicering] = useState(false);
+  const [soegning, setSoegning] = useState('');
+
+  // Saml overtrædelser fra databasen og fra evt. live godkend-fejl
+  const godkendFejlBrud =
+    godkend.error instanceof ApiFejl && godkend.error.kode === 'WELFARE_GUARD_FEJL'
+      ? godkend.error.detaljer
+      : [];
+  const brud = Array.from(new Set([...(k?.welfare_guard_overtraedelser ?? []), ...godkendFejlBrud]));
+
+  const erKunSoftConstraints =
+    brud.length > 0 &&
+    brud.every(
+      (b) =>
+        b.startsWith('HC08_NIVEAU_BEGYNDER') ||
+        b.startsWith('HC08_NIVEAU_OEVET') ||
+        b.startsWith('HC08_PART_UDEN_NIVEAUGODKENDELSE'),
+    );
+  const kanGodkendes = k?.status === 'Kladde' && (brud.length === 0 || erKunSoftConstraints);
 
   function koerTildeling() {
     koer.mutate(
@@ -222,11 +286,17 @@ export function KabaleSide() {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">Kabalen – {maanedNavn(maaned)}</h1>
-        <nav aria-label="Måned" className="flex gap-1">
-          <Link to={`/admin/kabale/${forskydMaaned(maaned, -1)}`} className={linkStil}>
+        <nav aria-label="Måned" className="flex gap-1.5 items-center">
+          <Link
+            to={`/admin/kabale/${forskydMaaned(maaned, -1)}`}
+            className="inline-flex items-center px-3 py-1.5 rounded-lg border border-stone-300 bg-white text-stone-700 hover:bg-stone-50 hover:text-stone-900 text-xs font-semibold shadow-xs transition"
+          >
             ← Forrige måned
           </Link>
-          <Link to={`/admin/kabale/${forskydMaaned(maaned, 1)}`} className={linkStil}>
+          <Link
+            to={`/admin/kabale/${forskydMaaned(maaned, 1)}`}
+            className="inline-flex items-center px-3 py-1.5 rounded-lg border border-stone-300 bg-white text-stone-700 hover:bg-stone-50 hover:text-stone-900 text-xs font-semibold shadow-xs transition"
+          >
             Næste måned →
           </Link>
         </nav>
@@ -243,24 +313,48 @@ export function KabaleSide() {
               type="button"
               onClick={() => setVisIndstillinger(true)}
               title="Indstillinger til tildeling"
-              className={`flex items-center justify-center rounded px-2.5 text-white transition-colors hover:bg-emerald-800 ${
-                reserverBegynderHeste ? 'bg-emerald-900 text-amber-300 font-bold' : ''
+              className={`flex items-center justify-center rounded px-2.5 text-white transition-colors hover:bg-emerald-800 cursor-pointer ${
+                reserverBegynderHeste || reserverSpringHeste ? 'bg-emerald-900 text-amber-300 font-bold' : ''
               }`}
             >
               <span className="text-base">⚙️</span>
             </button>
           </div>
-          {k?.status === 'Kladde' && k.welfare_guard_overtraedelser.length === 0 && (
-            <button
-              type="button"
-              onClick={() => godkend.mutate(k.id)}
-              disabled={godkend.isPending}
-              className="min-h-[44px] px-5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-base shadow-md shadow-blue-900/20 transition-all hover:scale-[1.02] cursor-pointer flex items-center gap-2 ring-2 ring-blue-400/50"
-              title="Godkend denne kørsel som gyldig plan"
-            >
-              <span>✓</span>
-              <span>{godkend.isPending ? 'Godkender…' : 'Godkend kørsel'}</span>
-            </button>
+          {k?.status === 'Kladde' && (
+            brud.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => godkend.mutate(k.id)}
+                disabled={godkend.isPending}
+                className="min-h-[44px] px-5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-base shadow-md shadow-blue-900/20 transition-all hover:scale-[1.02] cursor-pointer flex items-center gap-2 ring-2 ring-blue-400/50"
+                title="Godkend denne kørsel som gyldig plan"
+              >
+                <span>✓</span>
+                <span>{godkend.isPending ? 'Godkender…' : 'Godkend kørsel'}</span>
+              </button>
+            ) : erKunSoftConstraints ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (bekraeftDispensation) {
+                    godkend.mutate({ id: k.id, tilladNiveauDispensation: true });
+                  } else {
+                    // Scroll ned til og fokuser på den gule dispensationskasse
+                    document.getElementById('dispensations-advarsel')?.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                disabled={godkend.isPending}
+                className={`min-h-[44px] px-5 rounded-lg font-bold text-base shadow-md transition-all flex items-center gap-2 cursor-pointer ${
+                  bekraeftDispensation
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-400/50'
+                    : 'bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300'
+                }`}
+                title={bekraeftDispensation ? 'Godkend kørsel med bekræftet dispensation' : 'Kræver bekræftelse af dispensation'}
+              >
+                <span>⚠️</span>
+                <span>{godkend.isPending ? 'Godkender…' : bekraeftDispensation ? 'Godkend med dispensation' : 'Kræver dispensation'}</span>
+              </button>
+            ) : null
           )}
           {k?.status === 'Godkendt' && harRolle(session, 'Ledelse') && (
             <Knap onClick={() => setBekraefter(true)}>Publicér</Knap>
@@ -294,14 +388,65 @@ export function KabaleSide() {
           <button
             type="button"
             onClick={() => setReserverBegynderHeste(false)}
-            className="font-medium underline hover:text-amber-950"
+            className="font-medium underline hover:text-amber-950 cursor-pointer"
           >
             Nulstil
           </button>
         </div>
       )}
 
-      <FejlBesked fejl={koer.error ?? godkend.error ?? publicer.error ?? koersler.error ?? koersel.error} />
+      {reserverSpringHeste && (
+        <div className="flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
+          <div className="flex items-center gap-2">
+            <span>⚙️</span>
+            <span>
+              <strong>Aktiv indstilling:</strong> Spring-godkendte heste reserveres primært til springhold først.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReserverSpringHeste(false)}
+            className="font-medium underline hover:text-amber-950 cursor-pointer"
+          >
+            Nulstil
+          </button>
+        </div>
+      )}
+
+      {/* GUL DISPENSATIONSKASSE: Vises hvis der er soft constraints (niveau-advarsler) og kørslen er Kladde */}
+      {k?.status === 'Kladde' && erKunSoftConstraints && (
+        <div id="dispensations-advarsel" className="rounded-xl border-2 border-amber-400 bg-amber-50 p-4 shadow-sm text-amber-950 space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl shrink-0">⚠️</span>
+            <div className="space-y-1">
+              <h3 className="font-bold text-sm text-amber-900">
+                Planen indeholder {brud.length} hestetildelinger med niveau-dispensation (Soft constraints)
+              </h3>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Der er tildelt heste til hold, hvor hesten ikke formelt er godkendt til niveauet (f.eks. mangel på begynderheste).
+                Alle fysiske velfærdsregler (max lektioner/dag, max ryttervægt, hviledage osv.) overholdes fortsat 100%.
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-amber-200/80 flex items-center justify-between gap-3">
+            <label className="flex items-center gap-2.5 text-xs font-semibold text-amber-950 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={bekraeftDispensation}
+                onChange={(e) => setBekraeftDispensation(e.target.checked)}
+                className="h-4 w-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500 cursor-pointer"
+              />
+              <span>Jeg bekræfter dispensation for uegnet hestetildeling (godkend via knappen foroven)</span>
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Skjul FejlBesked for WELFARE_GUARD_FEJL, hvis det udelukkende skyldes soft constraints, da den håndteres i den gule kasse */}
+      {!(godkend.error && erKunSoftConstraints) && (
+        <FejlBesked fejl={koer.error ?? godkend.error ?? publicer.error ?? koersler.error ?? koersel.error} />
+      )}
       {publiceret && (
         <p
           role="status"
@@ -328,13 +473,36 @@ export function KabaleSide() {
               hesteNavne={hesteNavne}
               onVisIkkeTildelt={() => setVisIkkeTildeltModal(true)}
             />
+            {/* Søgefelt til kabale (elever, heste, holdtitler såsom "mandag", "15:00", "Letøvet") */}
+            <div className="flex items-center justify-between gap-3 bg-white p-3 rounded-xl border border-stone-200 shadow-sm">
+              <div className="relative flex-1">
+                <input
+                  type="search"
+                  value={soegning}
+                  onChange={(e) => setSoegning(e.target.value)}
+                  placeholder="🔍 Søg efter elev, hest eller hold (f.eks. 'mandag', '15:00', 'Letøvet', 'Zigge')..."
+                  className="w-full rounded-lg border border-stone-300 bg-stone-50 px-3.5 py-2 text-sm text-stone-900 placeholder-stone-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                />
+              </div>
+              {soegning && (
+                <button
+                  type="button"
+                  onClick={() => setSoegning('')}
+                  className="text-xs font-semibold text-stone-500 hover:text-stone-800 cursor-pointer px-2 py-1 rounded hover:bg-stone-100"
+                >
+                  Ryd søgning
+                </button>
+              )}
+            </div>
             <HoldTabel
               koersel={k}
+              overtraedelser={brud}
               hold={hold.data ?? []}
               hesteNavne={hesteNavne}
               valgtId={valgtTildelingId}
               onVaelg={visBegrundelse}
               onJuster={k.status === 'Kladde' ? setJusterer : undefined}
+              soegning={soegning}
             />
           </div>
           <BegrundelsePanel ref={begrundelseRef} tildeling={valgt} hesteNavne={hesteNavne} />
@@ -357,10 +525,10 @@ export function KabaleSide() {
           onLuk={() => setVisIkkeTildeltModal(false)}
         >
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1 text-sm">
-            <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-3.5 text-xs text-amber-950 space-y-2">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/80 pb-2">
-                <span className="font-bold flex items-center gap-1.5 text-amber-900">
-                  <span>💡</span>
+            <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-4 text-xs text-amber-950 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/80 pb-3">
+                <span className="font-bold text-base sm:text-lg flex items-center gap-2 text-amber-950">
+                  <span className="text-xl">💡</span>
                   <span>Særtilladelse (Soft constraint)</span>
                 </span>
                 {k?.status === 'Kladde' && ikkeTildelte.length > 0 && (
@@ -376,13 +544,13 @@ export function KabaleSide() {
                         },
                       });
                     }}
-                    className="!px-3 !py-1 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white border-amber-600 shrink-0"
+                    className="!px-4 !py-2.5 text-sm font-bold bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white border-amber-600 shadow-md ring-2 ring-amber-400/50 shrink-0 cursor-pointer"
                   >
                     {saertildel.isPending ? 'Tildeler…' : '⚡ Særtildel alle (dispensation)'}
                   </Knap>
                 )}
               </div>
-              <p className="text-amber-900 leading-relaxed">
+              <p className="text-amber-900 leading-relaxed text-xs">
                 Niveau-mismatch betragtes som en <strong>soft constraint</strong> (et pædagogisk/uddannelsesmæssigt hensyn), da det ikke bryder hestevelfærden (fysiske grænser som max ryttervægt, dagsbelastning og hviledage overholdes stadig 100%). Elever og ridelærere skal blot være opmærksomme på hesten under lektionen.
               </p>
             </div>
@@ -416,9 +584,7 @@ export function KabaleSide() {
                           <td className="py-2.5 font-medium text-stone-900">{t.rytter_navn}</td>
                           <td className="py-2.5 text-stone-500">—</td>
                           <td className="py-2.5">
-                            <span className="inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700 border border-rose-200">
-                              Ikke tildelt – kapacitetsmangel
-                            </span>
+                            {k && <IkkeTildeltStatusBadge koerselId={k.id} tildelingId={t.id} />}
                           </td>
                           <td className="py-2.5 text-right">
                             <Knap
@@ -486,27 +652,57 @@ export function KabaleSide() {
       )}
       {bekraefter && k && (
         <Dialog aaben titel={`Publicér planen for ${maanedNavn(maaned)}`} onLuk={() => setBekraefter(false)}>
-          <p>
-            Planen bliver til lektioner med pladser for alle hold i måneden. Erstatter den en tidligere plan,
-            ændres kun lektioner fra i dag.
-          </p>
-          <div className="mt-4 flex justify-end gap-2">
-            <Knap variant="sekundaer" onClick={() => setBekraefter(false)}>
-              Annullér
-            </Knap>
-            <Knap
-              disabled={publicer.isPending}
-              onClick={() =>
-                publicer.mutate(k.id, {
-                  onSuccess: (svar) => {
-                    setPubliceret(svar);
-                    setBekraefter(false);
-                  },
-                })
-              }
-            >
-              Publicér
-            </Knap>
+          <div className="space-y-4 text-sm text-stone-700">
+            <p>
+              Planen bliver til lektioner med pladser for alle hold i måneden. Erstatter den en tidligere plan,
+              ændres kun lektioner fra i dag.
+            </p>
+
+            {k.statistik.ikke_tildelt > 0 && (
+              <div className="rounded-xl border-2 border-rose-400 bg-rose-50 p-4 text-rose-950 space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <span className="text-2xl shrink-0">⚠️</span>
+                  <div>
+                    <h4 className="font-bold text-sm text-rose-900">
+                      Advarsel: {k.statistik.ikke_tildelt} elev(er) mangler hestetildeling
+                    </h4>
+                    <p className="text-xs text-rose-800 mt-1 leading-relaxed">
+                      Planen indeholder elever, som ikke har fået tildelt en hest. Husk at have kontaktet forældre eller elever forud for publicering for at informere dem om situationen.
+                    </p>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2.5 pt-2 border-t border-rose-200 text-xs font-bold text-rose-950 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={bekraeftUfuldstaendigPublicering}
+                    onChange={(e) => setBekraeftUfuldstaendigPublicering(e.target.checked)}
+                    className="h-4 w-4 rounded border-rose-400 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                  />
+                  <span>Jeg bekræfter at publicere planen med manglende hestetildelinger og har kontaktet forældre</span>
+                </label>
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end gap-2 pt-2 border-t border-stone-200">
+              <Knap variant="sekundaer" onClick={() => setBekraefter(false)}>
+                Annullér
+              </Knap>
+              <Knap
+                disabled={publicer.isPending || (k.statistik.ikke_tildelt > 0 && !bekraeftUfuldstaendigPublicering)}
+                onClick={() =>
+                  publicer.mutate(k.id, {
+                    onSuccess: (svar) => {
+                      setPubliceret(svar);
+                      setBekraefter(false);
+                      setBekraeftUfuldstaendigPublicering(false);
+                    },
+                  })
+                }
+              >
+                Publicér
+              </Knap>
+            </div>
           </div>
         </Dialog>
       )}

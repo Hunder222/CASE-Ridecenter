@@ -12,9 +12,28 @@ export const rytterRuter: FastifyPluginAsyncZod = async (app) => {
   const kunLedelse = kraevRoller('Ledelse');
 
   app.get('/ryttere', { onRequest: kunLedelse, schema: { response: { 200: z.array(Rytter) } } }, async () =>
-    (await app.prisma.rytter.findMany({ orderBy: [{ fornavn: 'asc' }, { efternavn: 'asc' }] })).map(
-      rytterDto,
-    ),
+    (
+      await app.prisma.rytter.findMany({
+        orderBy: [{ fornavn: 'asc' }, { efternavn: 'asc' }],
+        include: {
+          sikkerhedsprofil: { select: { paakraevede_heste: true } },
+          tilmeldinger: {
+            where: { gyldig_til: null },
+            include: {
+              hold: {
+                select: {
+                  id: true,
+                  holdnavn: true,
+                  niveau: true,
+                  er_springhold: true,
+                  ugedag: true,
+                },
+              },
+            },
+          },
+        },
+      })
+    ).map(rytterDto),
   );
 
   app.post(

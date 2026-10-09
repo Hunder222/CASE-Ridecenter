@@ -2,13 +2,25 @@ import React, { useEffect, useState } from 'react';
 import type { RapportTilsynSvar } from '@ridecenter/contracts';
 
 export const RapporterSide: React.FC = () => {
-  const [periodeFra, setPeriodeFra] = useState('2026-01-01');
-  const [periodeTil, setPeriodeTil] = useState('2026-06-30');
+  const [valgtTilstand, setValgtTilstand] = useState<'maaned' | 'specifik'>('maaned');
+  const [valgtMaaned, setValgtMaaned] = useState('2026-10');
+  const [periodeFra, setPeriodeFra] = useState('2026-10-01');
+  const [periodeTil, setPeriodeTil] = useState('2026-10-31');
   const [aldersgraense, setAldersgraense] = useState(25);
   const [genererer, setGenererer] = useState(false);
   const [rapportSvar, setRapportSvar] = useState<RapportTilsynSvar | null>(null);
   const [historik, setHistorik] = useState<any[]>([]);
   const [fejl, setFejl] = useState<string | null>(null);
+
+  const opdaterMaanedDatoer = (mStr: string) => {
+    setValgtMaaned(mStr);
+    const [aar, md] = mStr.split('-').map(Number);
+    if (!aar || !md) return;
+    const sidsteDag = new Date(aar, md, 0).getDate();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    setPeriodeFra(`${aar}-${pad(md)}-01`);
+    setPeriodeTil(`${aar}-${pad(md)}-${pad(sidsteDag)}`);
+  };
 
   const hentHistorik = async () => {
     try {
@@ -112,34 +124,86 @@ export const RapporterSide: React.FC = () => {
       {/* FORMULAR */}
       <div className="rounded-2xl bg-white border border-stone-200 p-6 shadow-sm">
         <form onSubmit={haandterGenerer} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label htmlFor="fra-dato" className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1.5">
-                Periode fra
-              </label>
-              <input
-                id="fra-dato"
-                type="date"
-                value={periodeFra}
-                onChange={(e) => setPeriodeFra(e.target.value)}
-                className="w-full min-h-[44px] px-3.5 rounded-xl border border-stone-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                required
-              />
-            </div>
+          {/* Toggle Switch */}
+          <div className="flex items-center gap-2 mb-2 p-1 bg-stone-100 rounded-xl w-fit border border-stone-200">
+            <button
+              type="button"
+              onClick={() => {
+                setValgtTilstand('maaned');
+                opdaterMaanedDatoer(valgtMaaned);
+              }}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                valgtTilstand === 'maaned'
+                  ? 'bg-white text-stone-900 shadow-sm'
+                  : 'text-stone-600 hover:text-stone-900'
+              }`}
+            >
+              📅 Hel måned
+            </button>
+            <button
+              type="button"
+              onClick={() => setValgtTilstand('specifik')}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                valgtTilstand === 'specifik'
+                  ? 'bg-white text-stone-900 shadow-sm'
+                  : 'text-stone-600 hover:text-stone-900'
+              }`}
+            >
+              ↔️ Specifikt interval (fra/til)
+            </button>
+          </div>
 
-            <div>
-              <label htmlFor="til-dato" className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1.5">
-                Periode til
-              </label>
-              <input
-                id="til-dato"
-                type="date"
-                value={periodeTil}
-                onChange={(e) => setPeriodeTil(e.target.value)}
-                className="w-full min-h-[44px] px-3.5 rounded-xl border border-stone-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                required
-              />
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {valgtTilstand === 'maaned' ? (
+              <div className="sm:col-span-2">
+                <label htmlFor="valgt-maaned" className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1.5">
+                  Vælg måned
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    id="valgt-maaned"
+                    type="month"
+                    value={valgtMaaned}
+                    onChange={(e) => opdaterMaanedDatoer(e.target.value)}
+                    className="w-full sm:w-64 min-h-[44px] px-3.5 rounded-xl border border-stone-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                  <span className="text-xs text-stone-500 font-medium">
+                    (Dækker {periodeFra} til {periodeTil})
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label htmlFor="fra-dato" className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1.5">
+                    Periode fra
+                  </label>
+                  <input
+                    id="fra-dato"
+                    type="date"
+                    value={periodeFra}
+                    onChange={(e) => setPeriodeFra(e.target.value)}
+                    className="w-full min-h-[44px] px-3.5 rounded-xl border border-stone-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="til-dato" className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1.5">
+                    Periode til
+                  </label>
+                  <input
+                    id="til-dato"
+                    type="date"
+                    value={periodeTil}
+                    onChange={(e) => setPeriodeTil(e.target.value)}
+                    className="w-full min-h-[44px] px-3.5 rounded-xl border border-stone-300 bg-white text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                </div>
+              </>
+            )}
 
             <div>
               <label htmlFor="aldersgraense" className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1.5">

@@ -19,15 +19,118 @@ export class DashboardService {
       },
     });
 
-    let samletKapacitet = 0;
-    let samletTilmeldte = 0;
-    for (const h of holdListe) {
-      samletKapacitet += h.max_kapacitet;
-      samletTilmeldte += h.tilmeldinger.length;
+    const heste = await this.prisma.hest.findMany({
+      where: { aktiv: true },
+      orderBy: { navn: 'asc' },
+    });
+
+    function beregnGruppeKapacitet(params: {
+      hold: typeof holdListe;
+      heste: typeof heste;
+      erHestEgnet: (h: (typeof heste)[0]) => boolean;
+      getHestDagsKapacitet?: (h: (typeof heste)[0], dag: number) => number;
+      getHestUgeKapacitet?: (h: (typeof heste)[0]) => number;
+      nominelKapacitet?: number;
+      erHoldCentreret?: boolean;
+    }) {
+      const { hold, heste: hesteListe, erHestEgnet } = params;
+      const tilmeldte = hold.reduce((sum, h) => sum + h.tilmeldinger.length, 0);
+      const raskeEgnede = hesteListe.filter((h) => erHestEgnet(h) && h.sundhedsstatus === 'Aktiv');
+
+      const holdDage = Array.from(new Set(hold.map((h) => h.ugedag))).sort();
+      let ugeKapacitet = 0;
+      if (params.getHestUgeKapacitet) {
+        ugeKapacitet = raskeEgnede.reduce((sum, h) => sum + params.getHestUgeKapacitet!(h), 0);
+      } else if (params.nominelKapacitet !== undefined) {
+        ugeKapacitet = params.nominelKapacitet;
+      } else {
+        for (const h of raskeEgnede) {
+          for (const dag of holdDage) {
+            if (h.hviledag !== dag) {
+              ugeKapacitet += h.skaane ? 2 : h.max_lektioner_dag;
+            }
+          }
+        }
+      }
+
+      const ugebasis_procent = ugeKapacitet > 0 ? Math.round((tilmeldte / ugeKapacitet) * 100) : 0;
+
+      let maxDagsPct = 0;
+      let erOverHolddagMax = false;
+
+      for (const dag of holdDage) {
+        const dagHold = hold.filter((h) => h.ugedag === dag);
+        const dagElever = dagHold.reduce((sum, h) => sum + h.tilmeldinger.length, 0);
+        const dagHoldPladser = dagHold.reduce((sum, h) => sum + h.max_kapacitet, 0);
+        const tilgaengeligeHeste = raskeEgnede.filter((h) => h.hviledag !== dag);
+
+        let hesteKapacitet = 0;
+        for (const h of tilgaengeligeHeste) {
+          hesteKapacitet += params.getHestDagsKapacitet
+            ? params.getHestDagsKapacitet(h, dag)
+            : (h.skaane ? 2 : h.max_lektioner_dag);
+        }
+
+        // For samlet holdudnyttelse er grundlaget holdenes pladser, men begrænset af tilgængelige heste på dagen
+        const dagKapacitet = params.erHoldCentreret
+          ? Math.min(dagHoldPladser, hesteKapacitet)
+          : hesteKapacitet;
+
+        const dagPct = dagKapacitet > 0 ? Math.round((dagElever / dagKapacitet) * 100) : (dagElever > 0 ? 100 : 0);
+        if (dagPct > maxDagsPct) {
+          maxDagsPct = dagPct;
+        }
+        if (dagElever > dagKapacitet || dagPct > 100) {
+          erOverHolddagMax = true;
+        }
+      }
+
+      const effektiv_udnyttelse_procent = holdDage.length > 0 ? maxDagsPct : ugebasis_procent;
+
+      return {
+        tilmeldte,
+        kapacitet: ugeKapacitet,
+        effektiv_udnyttelse_procent,
+        ugebasis_procent,
+        er_over_holddag_max: erOverHolddagMax,
+      };
     }
 
-    const holdudnyttelsePct =
-      samletKapacitet > 0 ? Math.round((samletTilmeldte / samletKapacitet) * 100) : 0;
+    let samletKapacitet = 0;
+    for (const h of holdListe) {
+      samletKapacitet += h.max_kapacitet;
+    }
+
+    const samletDetaljer = beregnGruppeKapacitet({
+      hold: holdListe,
+      heste,
+      erHestEgnet: () => true,
+      nominelKapacitet: samletKapacitet,
+      erHoldCentreret: true,
+    });
+
+    const springHold = holdListe.filter((h) => h.er_springhold);
+    const springDetaljer = beregnGruppeKapacitet({
+      hold: springHold,
+      heste,
+      erHestEgnet: (h) => !h.springforbud && (h.max_spring_uge ?? 0) > 0,
+      getHestDagsKapacitet: () => 1,
+      getHestUgeKapacitet: (h) => h.max_spring_uge ?? 1,
+    });
+
+    const begynderHold = holdListe.filter((h) => h.niveau === 'Begynder' || h.niveau === 'Traekhold');
+    const begynderDetaljer = beregnGruppeKapacitet({
+      hold: begynderHold,
+      heste,
+      erHestEgnet: (h) => !!h.godkendt_til_begyndere,
+    });
+
+    const oevetHold = holdListe.filter((h) => h.niveau === 'Oevet' || h.niveau === 'Letoevet');
+    const oevetDetaljer = beregnGruppeKapacitet({
+      hold: oevetHold,
+      heste,
+      erHestEgnet: (h) => h.egnet_oevet !== false,
+    });
 
     // 2. Heste ude af drift
     const hesteUdeAfDrift = await this.prisma.hest.count({
@@ -98,10 +201,7 @@ export class DashboardService {
     }
 
     // 6. Hestebelastningsfordeling heatmap (hest mod ugedag 1-7)
-    const heste = await this.prisma.hest.findMany({
-      where: { aktiv: true },
-      orderBy: { navn: 'asc' },
-    });
+    // heste er allerede hentet ovenfor
 
     // Find alle måneder der har kørsler
     const alleKoersler = await this.prisma.tildelingskoersel.findMany({
@@ -169,7 +269,7 @@ export class DashboardService {
     }
 
     return {
-      ugentlig_holdudnyttelse_procent: holdudnyttelsePct,
+      ugentlig_holdudnyttelse_procent: samletDetaljer.effektiv_udnyttelse_procent,
       antal_heste_ude_af_drift: hesteUdeAfDrift,
       aktive_vikarkoder: aktiveVikarkoder,
       afventende_ventelisteforslag: afventendeForslag,
@@ -177,6 +277,13 @@ export class DashboardService {
       hest_belastningsfordeling: hestBelastningsfordeling,
       valgt_maaned: valgtMaaned,
       tilgaengelige_maaneder: tilgaengeligeMaaneder,
+      begynder_heste_udnyttelse_procent: begynderDetaljer.effektiv_udnyttelse_procent,
+      oevet_heste_udnyttelse_procent: oevetDetaljer.effektiv_udnyttelse_procent,
+      spring_heste_udnyttelse_procent: springDetaljer.effektiv_udnyttelse_procent,
+      samlet_holdudnyttelse_detaljer: samletDetaljer,
+      begynder_heste_detaljer: begynderDetaljer,
+      oevet_heste_detaljer: oevetDetaljer,
+      spring_heste_detaljer: springDetaljer,
     };
   }
 }

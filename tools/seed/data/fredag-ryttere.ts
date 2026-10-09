@@ -160,7 +160,11 @@ export function byggFredagsRyttere(gyldigFra: string): {
       erfaringsniveau: niveauFor(kilde.hold),
       klarTilUdvikling: kilde.klarTilUdvikling ?? false,
       erHjaelper: kilde.erHjaelper ?? false,
-      partaftaleHestId: kilde.partHest ? hestId(kilde.partHest) : null,
+      partaftaleHestId: kilde.partHest
+        ? hestId(kilde.partHest)
+        : kilde.profil?.paakraevede?.[0]
+          ? hestId(kilde.profil.paakraevede[0])
+          : null,
       partaftaleGodkendtTrodsNiveau: false,
       forbudteHeste: (kilde.profil?.forbudte ?? []).map(hestId),
       paakraevedeHeste: (kilde.profil?.paakraevede ?? []).map(hestId),

@@ -23,10 +23,10 @@ export const LaasSide: React.FC = () => {
 
   const tastCiffer = (ciffer: string) => {
     if (lockoutSekunder > 0 || behandler) return;
-    if (pin.length < 4) {
+    if (pin.length < 6) {
       const nyPin = pin + ciffer;
       setPin(nyPin);
-      if (nyPin.length === 4) {
+      if (nyPin.length === 6) {
         bekraeftPin(nyPin);
       }
     }
@@ -122,12 +122,12 @@ export const LaasSide: React.FC = () => {
             <span className="text-2xl" role="img" aria-label="Hest">🐎</span>
             <h1 className="text-3xl font-bold tracking-tight text-white">Bøgegården Stald</h1>
           </div>
-          <p className="text-slate-400 text-sm">Indtast 4-cifret PIN for at låse op</p>
+          <p className="text-slate-400 text-sm">Indtast 6-cifret PIN for at låse op</p>
         </div>
 
         {/* PIN prikker */}
         <div className="flex gap-4 mb-8">
-          {[0, 1, 2, 3].map((index) => (
+          {[0, 1, 2, 3, 4, 5].map((index) => (
             <div
               key={index}
               className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
@@ -195,7 +195,7 @@ export const LaasSide: React.FC = () => {
           onClick={() => navigate('/stald/vikar')}
           className="w-full py-4 min-h-[56px] rounded-xl bg-slate-900/90 border border-slate-700/80 text-blue-400 font-medium text-base hover:bg-slate-800 active:scale-98 transition text-center cursor-pointer"
         >
-          Jeg er vikar (6-cifret kode)
+          Jeg er vikar (5-cifret kode)
         </button>
       </div>
     </div>

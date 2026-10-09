@@ -17,15 +17,27 @@ async function kontrollerPlan(
   prisma: PrismaClient,
   maaned: string,
   tildelinger: TildelingRaekke[],
+  tilladNiveauDispensation = false,
 ): Promise<void> {
   const { input } = await bygAllokeringsInput(prisma, maaned);
-  const brud = validerPlan(
+  let brud = validerPlan(
     {
       maaned,
       tildelinger: tildelinger.map((t) => ({ holdtilmeldingId: t.holdtilmelding_id, hestId: t.hest_id })),
     },
     input,
   );
+
+  // Hvis dispensation for niveau (soft constraint) er bekræftet, filtreres HC08 niveaubrud fra
+  if (tilladNiveauDispensation) {
+    brud = brud.filter(
+      (o) =>
+        !o.kode.startsWith('HC08_NIVEAU_BEGYNDER') &&
+        !o.kode.startsWith('HC08_NIVEAU_OEVET') &&
+        !o.kode.startsWith('HC08_PART_UDEN_NIVEAUGODKENDELSE'),
+    );
+  }
+
   if (brud.length > 0) {
     throw new DomaeneFejl(
       'WELFARE_GUARD_FEJL',
@@ -40,11 +52,12 @@ export async function godkendKoersel(
   app: FastifyInstance,
   id: string,
   bruger: SessionBruger,
+  tilladNiveauDispensation = false,
 ): Promise<Tildelingskoersel> {
   const koersel = await hentKoerselRaekke(app.prisma, id);
   if (koersel.status !== 'Kladde')
     throw new DomaeneFejl('KOERSEL_IKKE_KLADDE', 'Kun en kladde kan godkendes', 409);
-  await kontrollerPlan(app.prisma, koersel.maaned, koersel.tildelinger);
+  await kontrollerPlan(app.prisma, koersel.maaned, koersel.tildelinger, tilladNiveauDispensation);
   const godkendt = await app.prisma.$transaction(async (tx) => {
     const raekke = await tx.tildelingskoersel.update({ where: { id }, data: { status: 'Godkendt' } });
     await logHaendelse(tx, {
@@ -54,7 +67,11 @@ export async function godkendKoersel(
       bruger,
       tidspunkt: app.ur(),
       foer: { status: 'Kladde' },
-      efter: { status: 'Godkendt', maaned: koersel.maaned },
+      efter: {
+        status: 'Godkendt',
+        maaned: koersel.maaned,
+        niveau_dispensation: tilladNiveauDispensation ? true : undefined,
+      },
     });
     return raekke;
   });
@@ -81,7 +98,8 @@ export async function publicerKoersel(
   if (koersel.status !== 'Godkendt') {
     throw new DomaeneFejl('IKKE_GODKENDT', 'Kørslen skal godkendes, før den kan publiceres', 409);
   }
-  await kontrollerPlan(app.prisma, koersel.maaned, koersel.tildelinger);
+  // En kørsel, der allerede er godkendt (evt. med dispensation), tillader niveau-dispensation ved publicering
+  await kontrollerPlan(app.prisma, koersel.maaned, koersel.tildelinger, true);
   const idag = iDag(app.ur());
 
   const prHold = new Map<string, TildelingRaekke[]>();

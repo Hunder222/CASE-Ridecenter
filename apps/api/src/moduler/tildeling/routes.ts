@@ -1,4 +1,5 @@
 import {
+  GodkendKoerselInput,
   Hestetildeling,
   KandidatHest,
   KoerselStart,
@@ -84,8 +85,21 @@ export const tildelingsRuter: FastifyPluginAsyncZod = async (app) => {
 
   app.post(
     '/tildeling/koersler/:id/godkend',
-    { onRequest: begge, schema: { params: IdParams, response: { 200: Tildelingskoersel } } },
-    async (request) => godkendKoersel(app, request.params.id, aktuelBruger(request)),
+    {
+      onRequest: begge,
+      schema: {
+        params: IdParams,
+        body: GodkendKoerselInput,
+        response: { 200: Tildelingskoersel },
+      },
+    },
+    async (request) =>
+      godkendKoersel(
+        app,
+        request.params.id,
+        aktuelBruger(request),
+        Boolean((request.body as { tillad_niveau_dispensation?: boolean } | null | undefined)?.tillad_niveau_dispensation),
+      ),
   );
 
   app.post(

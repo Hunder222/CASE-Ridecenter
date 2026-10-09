@@ -62,7 +62,7 @@ export const hesteRuter: FastifyPluginAsyncZod = async (app) => {
         params: IdParams,
         body: z.object({
           type: z.enum(['Helbred', 'Adfaerd']),
-          alvorlighed: z.enum(['Info', 'Obs', 'KanIkkeBruges']),
+          alvorlighed: z.enum(['Info', 'Obs', 'KanIkkeBruges', 'Sygemeldt', 'Skadet', 'Karantaene', 'Raskmeldt']),
           beskrivelse: z.string().trim().min(1).max(500),
         }),
         response: { 200: z.object({ ok: z.boolean(), id: z.string() }) },

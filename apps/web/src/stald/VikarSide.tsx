@@ -116,7 +116,7 @@ export const VikarSide: React.FC = () => {
 
   const tastCiffer = (ciffer: string) => {
     if (indsender) return;
-    if (vikarkode.length < 6) {
+    if (vikarkode.length < 5) {
       const nyKode = vikarkode + ciffer;
       setVikarkode(nyKode);
       setFejl(null);
@@ -146,8 +146,8 @@ export const VikarSide: React.FC = () => {
     }
 
     const renKode = vikarkode.trim();
-    if (!/^[0-9]{6}$/.test(renKode)) {
-      setFejl('Vikarkoden skal være præcis 6 cifre');
+    if (!/^[0-9]{5}$/.test(renKode)) {
+      setFejl('Vikarkoden skal være præcis 5 cifre');
       return;
     }
 
@@ -289,9 +289,9 @@ export const VikarSide: React.FC = () => {
           </div>
         </div>
 
-        {/* 3. Prikker / ciffervisning for 6-cifret kode */}
+        {/* 3. Prikker / ciffervisning for 5-cifret kode */}
         <div className="flex items-center justify-center gap-2.5 mb-3.5">
-          {[0, 1, 2, 3, 4, 5].map((index) => {
+          {[0, 1, 2, 3, 4].map((index) => {
             const udfyldt = vikarkode.length > index;
             const ciffer = vikarkode[index];
             return (
@@ -360,7 +360,7 @@ export const VikarSide: React.FC = () => {
         <button
           type="button"
           onClick={() => haandterLogin()}
-          disabled={indsender || vikarkode.length !== 6 || fuldeNavn.trim().length < 3}
+          disabled={indsender || vikarkode.length !== 5 || fuldeNavn.trim().length < 3}
           className="w-full min-h-[50px] rounded-xl bg-sky-600 hover:bg-sky-500 active:bg-sky-700 disabled:opacity-40 disabled:hover:bg-sky-600 text-white font-bold text-base shadow-lg shadow-sky-950/50 transition flex items-center justify-center gap-2 cursor-pointer"
         >
           {indsender ? (

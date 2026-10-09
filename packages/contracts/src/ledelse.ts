@@ -53,6 +53,17 @@ export const HestBelastningCelle = z.object({
 });
 export type HestBelastningCelle = z.infer<typeof HestBelastningCelle>;
 
+export const KapacitetsGruppeDetaljer = z.object({
+  tilmeldte: z.number(),
+  kapacitet: z.number(),
+  effektiv_udnyttelse_procent: z.number(),
+  ugebasis_procent: z.number(),
+  er_over_holddag_max: z.boolean().optional(),
+  effektiv_kapacitet_ugedag: z.number().optional(),
+  bemaerkning: z.string().optional(),
+});
+export type KapacitetsGruppeDetaljer = z.infer<typeof KapacitetsGruppeDetaljer>;
+
 export const DashboardNoegletalSvar = z.object({
   ugentlig_holdudnyttelse_procent: z.number(),
   antal_heste_ude_af_drift: z.number().int(),
@@ -69,6 +80,13 @@ export const DashboardNoegletalSvar = z.object({
   hest_belastningsfordeling: z.array(HestBelastningCelle),
   valgt_maaned: z.string().optional(),
   tilgaengelige_maaneder: z.array(z.string()).optional(),
+  begynder_heste_udnyttelse_procent: z.number().optional(),
+  oevet_heste_udnyttelse_procent: z.number().optional(),
+  spring_heste_udnyttelse_procent: z.number().optional(),
+  samlet_holdudnyttelse_detaljer: KapacitetsGruppeDetaljer.optional(),
+  begynder_heste_detaljer: KapacitetsGruppeDetaljer.optional(),
+  oevet_heste_detaljer: KapacitetsGruppeDetaljer.optional(),
+  spring_heste_detaljer: KapacitetsGruppeDetaljer.optional(),
 });
 export type DashboardNoegletalSvar = z.infer<typeof DashboardNoegletalSvar>;
 

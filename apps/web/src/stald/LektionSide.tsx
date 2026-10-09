@@ -437,9 +437,9 @@ export function LektionSide() {
                 </div>
               </div>
 
-              {/* Action area: Stor Erstat hest knap (synlig efter tryk af "Redigér heste" i toppen) + Fremmøde knapper */}
+              {/* Action area: Stor Erstat hest knap (altid synlig ved advarsel/syg hest, eller ved tryk af "Redigér heste" i toppen) + Fremmøde knapper */}
               <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
-                {redigerHesteTilstand && !erOpsagt && (
+                {(redigerHesteTilstand || hestErSyg) && !erOpsagt && (
                   <button
                     type="button"
                     onClick={() => navigate(`/stald/plads/${plads.id}/erstat`)}

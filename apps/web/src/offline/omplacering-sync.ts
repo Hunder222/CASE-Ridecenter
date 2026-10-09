@@ -27,19 +27,31 @@ async function hentAktivBrugerId(): Promise<string | null> {
 export async function gemHestStatusMelding(input: {
   hestId: string;
   type: 'Helbred' | 'Adfaerd';
-  alvorlighed: 'Info' | 'Obs' | 'KanIkkeBruges';
+  alvorlighed: 'Info' | 'Obs' | 'KanIkkeBruges' | 'Sygemeldt' | 'Skadet' | 'Karantaene' | 'Raskmeldt';
   beskrivelse: string;
 }): Promise<void> {
   const brugerId = await hentAktivBrugerId();
   const kommandoId = crypto.randomUUID();
   const klientTidspunkt = new Date().toISOString();
 
-  // Opdatér lokal hest sundhedsstatus hvis KanIkkeBruges (fail-safe)
+  // Opdatér lokal hest sundhedsstatus hvis Sygemeldt, Skadet, Karantaene eller Raskmeldt
   const hest = await db.heste.get(input.hestId);
   if (hest) {
-    if (input.alvorlighed === 'KanIkkeBruges') {
+    if (input.alvorlighed === 'KanIkkeBruges' || input.alvorlighed === 'Sygemeldt') {
       await db.heste.update(input.hestId, {
         sundhedsstatus: 'Sygemeldt',
+      });
+    } else if (input.alvorlighed === 'Skadet') {
+      await db.heste.update(input.hestId, {
+        sundhedsstatus: 'Skadet',
+      });
+    } else if (input.alvorlighed === 'Karantaene') {
+      await db.heste.update(input.hestId, {
+        sundhedsstatus: 'Karantaene',
+      });
+    } else if (input.alvorlighed === 'Raskmeldt') {
+      await db.heste.update(input.hestId, {
+        sundhedsstatus: 'Aktiv',
       });
     }
   }

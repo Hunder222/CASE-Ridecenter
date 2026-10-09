@@ -113,8 +113,22 @@ export async function skrivSeed(
         },
       });
 
-      // 4. 3 aktive 6-cifrede vikarkoder (T170)
-      const demoVikarKoder = ['123456', '654321', '888999'];
+      // 4. Vikarkoder (5-cifrede jf. ny spec)
+      // Fast vikar: Sofie (Fast vikar) - 12345
+      const hashSofie = await argon2.hash('12345');
+      const omTiAar = new Date(nu.getTime() + 3650 * 24 * 60 * 60 * 1000);
+      await tx.vikarEngangskode.create({
+        data: {
+          kode_hash: hashSofie,
+          udstedt_af: ledelse.id,
+          udloebsdato: omTiAar,
+          anvendt_af_vikarnavn: 'Sofie (Fast vikar)',
+          status: 'Aktiv',
+        },
+      });
+
+      // 2 aktive midlertidige 5-cifrede vikarkoder (54321, 88899)
+      const demoVikarKoder = ['54321', '88899'];
       const om90Dage = new Date(nu.getTime() + 90 * 24 * 60 * 60 * 1000);
       for (const vk of demoVikarKoder) {
         const vkHash = await argon2.hash(vk);
@@ -425,49 +439,6 @@ export async function skrivSeed(
           },
         });
       }
-
-      // 7. Seed faste og akutte vikarkoder (FR-013 / FR-024)
-      const tiAar = new Date(nu);
-      tiAar.setFullYear(tiAar.getFullYear() + 10);
-      const halvfemsDage = new Date(nu);
-      halvfemsDage.setDate(halvfemsDage.getDate() + 90);
-
-      // Fast vikar: Sofie (Fast vikar) - 123456
-      const hash123456 = '$argon2id$v=19$m=19456,t=2,p=1$7v18jM6+b6w7hU/30+V6YQ$iM2c2i6H5Vq8sPjF2L6N5U4D8S6W3Q1R5T9Y0U2I4O6';
-      // Fallback akut kode: 654321
-      const hash654321 = '$argon2id$v=19$m=19456,t=2,p=1$4w29kN7+c7x8iV/41+W7ZR$jN3d3j7I6Wr9tQkG3M7O6V5E9T7X4R2S6U0Z1V3J5P7';
-
-      // We generate actual Argon2 hashes dynamically if argon2 is available
-      let h123 = hash123456;
-      let h654 = hash654321;
-      try {
-        const argon2 = await import('argon2');
-        h123 = await argon2.hash('123456');
-        h654 = await argon2.hash('654321');
-      } catch {
-        // Fallback to pre-computed strings
-      }
-
-      await tx.vikarEngangskode.create({
-        data: {
-          kode_hash: h123,
-          udstedt_af: ledelse.id,
-          udstedt_dato: nu,
-          udloebsdato: tiAar,
-          anvendt_af_vikarnavn: 'Sofie (Fast vikar)',
-          status: 'Aktiv',
-        },
-      });
-
-      await tx.vikarEngangskode.create({
-        data: {
-          kode_hash: h654,
-          udstedt_af: ledelse.id,
-          udstedt_dato: nu,
-          udloebsdato: halvfemsDage,
-          status: 'Aktiv',
-        },
-      });
     },
     { timeout: 60_000 },
   );

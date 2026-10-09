@@ -20,6 +20,9 @@ export const StaldPlads = z.object({
   cheat_sheet_koder: z.array(z.string()),
   /** Anonymiseret og dekrypteret instruks (højst 200 tegn). */
   adfaerdsinstruks: z.string().nullable(),
+  /** Angiver om eleven har en aktiv partaftale */
+  har_partaftale: z.boolean().optional(),
+  partaftale_hest_id: Uuid.nullable().optional(),
 });
 export type StaldPlads = z.infer<typeof StaldPlads>;
 
@@ -63,11 +66,11 @@ export type EnhedRegistrerBody = z.infer<typeof EnhedRegistrerBody>;
 export const EnhedUdstedBody = z.strictObject({ navn: z.string().min(1).max(100) });
 export type EnhedUdstedBody = z.infer<typeof EnhedUdstedBody>;
 
-export const PinLoginBody = z.strictObject({ pin: z.string().regex(/^[0-9]{4}$/, 'PIN skal være 4 cifre') });
+export const PinLoginBody = z.strictObject({ pin: z.string().regex(/^[0-9]{6}$/, 'PIN skal være 6 cifre') });
 export type PinLoginBody = z.infer<typeof PinLoginBody>;
 
 export const VikarLoginBody = z.strictObject({
-  vikarkode: z.string().regex(/^[0-9]{6}$/, 'Vikarkoden skal være 6 cifre'),
+  vikarkode: z.string().regex(/^[0-9]{5}$/, 'Vikarkoden skal være 5 cifre'),
   fulde_navn: z.string().trim().min(3, 'Skriv dit fulde navn'),
 });
 export type VikarLoginBody = z.infer<typeof VikarLoginBody>;
@@ -113,7 +116,7 @@ export type FremmoedePost = z.infer<typeof FremmoedePost>;
 
 export const HestestatusmeldingInput = z.strictObject({
   type: z.enum(['Helbred', 'Adfaerd']),
-  alvorlighed: z.enum(['Info', 'Obs', 'KanIkkeBruges']),
+  alvorlighed: z.enum(['Info', 'Obs', 'KanIkkeBruges', 'Sygemeldt', 'Skadet', 'Karantaene', 'Raskmeldt']),
   beskrivelse: z.string().trim().min(1, 'Beskrivelse påkrævet').max(500, 'Beskrivelsen må højst være 500 tegn'),
 });
 export type HestestatusmeldingInput = z.infer<typeof HestestatusmeldingInput>;

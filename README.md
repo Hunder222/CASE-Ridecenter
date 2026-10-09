@@ -149,8 +149,8 @@ npm run dev                                     # API på :3000 og web på :5173
   - **Malene (Ledelse):** `malene@demo.dk` (adgangskode fra `SEED_ADGANGSKODE` i `.env`)
   - **Marie (Ridelærer):** `marie@demo.dk`
 - **Staldflade (`http://localhost:5173/stald`):**
-  - **PIN-login:** Malene: `1111`, Marie: `2222`, Camilla: `2223`, Birgit: `2224`, Staldelev (Ella J.): `3333`
-  - **Vikaradgang:** Vælg "Jeg er vikar" og brug en af de seedede 6-cifrede koder: `123456`, `654321` eller `888999`.
+  - **PIN-login:** Malene: `111111`, Marie: `222222`, Camilla: `222333`, Birgit: `222444`, Staldelev (Ella J.): `333333`
+  - **Vikaradgang:** Vælg "Jeg er vikar" og brug en af de seedede 5-cifrede koder: `12345` (Sofie Fast vikar), `54321` eller `88899`.
 
 ### Kørsel på tablet over lokalt netværk / HTTPS
 For at køre staldfladen på en fysisk iPad eller tablet på samme netværk:

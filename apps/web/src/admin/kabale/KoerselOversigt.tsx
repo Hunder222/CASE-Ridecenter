@@ -148,13 +148,26 @@ export function KoerselOversigt({
     grupperedeBrud.set(label, entry);
   }
 
+  const erKunSoftConstraints =
+    brud.length > 0 &&
+    brud.every(
+      (b) =>
+        b.startsWith('HC08_NIVEAU_BEGYNDER') ||
+        b.startsWith('HC08_NIVEAU_OEVET') ||
+        b.startsWith('HC08_PART_UDEN_NIVEAUGODKENDELSE'),
+    );
+
   return (
     <section aria-label="Kørslen" className="rounded-lg border border-stone-300 bg-white p-4">
       <div className="flex flex-wrap items-center gap-3">
         <Badge variant={STATUSFARVE[koersel.status]}>{koersel.status}</Badge>
-        <span className="text-sm text-stone-600">Beregnet på {koersel.varighed_ms} ms</span>
+        {!erManuel && <span className="text-sm text-stone-600">Beregnet på {koersel.varighed_ms} ms</span>}
         {brud.length === 0 ? (
           <Badge variant="ok">Welfare Guard: 0 overtrædelser</Badge>
+        ) : erKunSoftConstraints ? (
+          <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 border border-amber-300">
+            Welfare Guard: {brud.length} niveau-advarsler (Soft constraints)
+          </span>
         ) : (
           <Badge variant="fejl">Welfare Guard: {brud.length} overtrædelser</Badge>
         )}
@@ -164,15 +177,31 @@ export function KoerselOversigt({
       </div>
 
       {brud.length > 0 && (
-        <div className="mt-4 rounded-md border border-rose-200 bg-rose-50/70 p-3.5">
+        <div
+          className={`mt-4 rounded-xl border p-3.5 ${
+            erKunSoftConstraints
+              ? 'border-amber-300 bg-amber-50/80 text-amber-950'
+              : 'border-rose-200 bg-rose-50/70 text-rose-950'
+          }`}
+        >
           <div className="flex items-center justify-between">
-            <div className="text-xs font-semibold uppercase tracking-wider text-rose-800">
-              Registrerede velfærds- og sikkerhedsbrud i planen ({brud.length})
+            <div
+              className={`text-xs font-semibold uppercase tracking-wider ${
+                erKunSoftConstraints ? 'text-amber-900' : 'text-rose-800'
+              }`}
+            >
+              {erKunSoftConstraints
+                ? `💡 Registrerede niveau-uoverensstemmelser (Soft constraints: ${brud.length})`
+                : `Registrerede velfærds- og sikkerhedsbrud i planen (${brud.length})`}
             </div>
             <button
               type="button"
               onClick={() => setVisDetaljer(!visDetaljer)}
-              className="text-xs font-medium text-rose-700 underline hover:text-rose-900"
+              className={`text-xs font-medium underline ${
+                erKunSoftConstraints
+                  ? 'text-amber-800 hover:text-amber-950'
+                  : 'text-rose-700 hover:text-rose-900'
+              }`}
             >
               {visDetaljer ? 'Skjul detaljer' : `Vis alle (${brud.length})`}
             </button>
@@ -182,9 +211,19 @@ export function KoerselOversigt({
             {[...grupperedeBrud.entries()].map(([beskrivelse, { count, eksempler }]) => (
               <div
                 key={beskrivelse}
-                className="flex items-start gap-2 rounded border border-rose-200 bg-white p-2 text-xs text-rose-950"
+                className={`flex items-start gap-2 rounded border p-2 text-xs ${
+                  erKunSoftConstraints
+                    ? 'border-amber-200 bg-white text-amber-950'
+                    : 'border-rose-200 bg-white text-rose-950'
+                }`}
               >
-                <span className="inline-flex shrink-0 items-center justify-center rounded bg-rose-100 px-1.5 py-0.5 font-bold text-rose-800">
+                <span
+                  className={`inline-flex shrink-0 items-center justify-center rounded px-1.5 py-0.5 font-bold ${
+                    erKunSoftConstraints
+                      ? 'bg-amber-100 text-amber-900'
+                      : 'bg-rose-100 text-rose-800'
+                  }`}
+                >
                   {count}×
                 </span>
                 <div className="min-w-0">
@@ -203,12 +242,22 @@ export function KoerselOversigt({
             <div className="mt-3 border-t border-rose-200 pt-3">
               <div className="mb-1.5 text-xs font-medium text-rose-800">Fuld liste over overtrædelseskoder:</div>
               <ul className="max-h-48 overflow-y-auto space-y-1 font-mono text-xs text-rose-900 pl-2">
-                {brud.map((b, i) => (
-                  <li key={`${b}-${i}`} className="flex items-center gap-1.5">
-                    <span className="text-rose-400">•</span>
-                    <span>{b}</span>
-                  </li>
-                ))}
+                {brud.map((b, i) => {
+                  const parts = b.split(':');
+                  const targetId = parts[1];
+                  const hestNavn = targetId && hesteNavne ? hesteNavne.get(targetId) : undefined;
+                  return (
+                    <li key={`${b}-${i}`} className="flex items-center gap-1.5">
+                      <span className="text-rose-400">•</span>
+                      <span>
+                        {b}
+                        {hestNavn && (
+                          <span className="ml-1 font-bold text-rose-950 font-sans">({hestNavn})</span>
+                        )}
+                      </span>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}

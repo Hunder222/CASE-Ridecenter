@@ -13,6 +13,13 @@ import {
 
 const UGEDAGE = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag'];
 const NIVEAUER: Niveau[] = ['Traekhold', 'Begynder', 'Letoevet', 'Oevet', 'Parthold'];
+const NIVEAU_LABELS: Record<Niveau, string> = {
+  Traekhold: 'Trækhold',
+  Begynder: 'Begynder',
+  Letoevet: 'Letøvet',
+  Oevet: 'Øvet',
+  Parthold: 'Parthold',
+};
 
 export function HoldSide() {
   const { data: session } = useSession();
@@ -90,7 +97,7 @@ export function HoldSide() {
 
                         <h3 className="mt-2 text-base font-bold text-stone-800">{h.holdnavn}</h3>
                         <div className="mt-1 flex items-center gap-2 text-xs text-stone-600">
-                          <span>{h.niveau}</span>
+                          <span>{NIVEAU_LABELS[h.niveau] ?? h.niveau}</span>
                           <span>•</span>
                           <span>{h.varighed_min} min</span>
                           {h.er_springhold && (
@@ -368,7 +375,7 @@ function OpretHoldModal({ onLuk }: { onLuk: () => void }) {
               >
                 {NIVEAUER.map((n) => (
                   <option key={n} value={n}>
-                    {n}
+                    {NIVEAU_LABELS[n] ?? n}
                   </option>
                 ))}
               </select>

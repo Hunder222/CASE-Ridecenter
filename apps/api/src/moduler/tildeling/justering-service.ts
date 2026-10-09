@@ -198,7 +198,18 @@ export async function justerTildeling(
       include: TILDELING_INCLUDE,
     });
     const alle = await tx.hestetildeling.findMany({ where: { koersel_id: koerselId } });
-    await tx.tildelingskoersel.update({ where: { id: koerselId }, data: { statistik: statistikFra(alle) } });
+    const nyPlan = {
+      maaned: koersel.maaned,
+      tildelinger: alle.map((t) => ({ holdtilmeldingId: t.holdtilmelding_id, hestId: t.hest_id })),
+    };
+    const alleBrud = validerPlan(nyPlan, grundlag.input);
+    await tx.tildelingskoersel.update({
+      where: { id: koerselId },
+      data: {
+        statistik: statistikFra(alle),
+        welfare_guard_resultat: alleBrud.map((o) => o.kode),
+      },
+    });
     await logHaendelse(tx, {
       handling: 'TILDELING_JUSTERET',
       entitet: 'hestetildeling',
@@ -325,7 +336,18 @@ export async function saertildelAlle(
         });
       }
       const alle = await tx.hestetildeling.findMany({ where: { koersel_id: koerselId } });
-      await tx.tildelingskoersel.update({ where: { id: koerselId }, data: { statistik: statistikFra(alle) } });
+      const nyPlan = {
+        maaned: koersel.maaned,
+        tildelinger: alle.map((t) => ({ holdtilmeldingId: t.holdtilmelding_id, hestId: t.hest_id })),
+      };
+      const alleBrud = validerPlan(nyPlan, grundlag.input);
+      await tx.tildelingskoersel.update({
+        where: { id: koerselId },
+        data: {
+          statistik: statistikFra(alle),
+          welfare_guard_resultat: alleBrud.map((o) => o.kode),
+        },
+      });
     });
   }
 
