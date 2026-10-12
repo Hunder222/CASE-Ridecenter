@@ -46,9 +46,15 @@ Systemet er opdelt i tre operationelle faser i overensstemmelse med projektets p
 * **Vikar-beredskab & Digitalt Cheat Sheet (F2.3):** Hurtig vikaradgang via forududstedte engangskoder (uden krav om fysisk overlevering) samt et kompakt sikkerheds-*Cheat Sheet* med anonymiserede instrukser (uden medicinske diagnoser).
 
 ### Fase 3: Afvikling af undervisning & Ledelsesoverblik
-* **Touch-optimeret fremmøderegistrering (F3.1):** Lynhurtig batch-afkrydsning af et helt hold på under 15 sekunder på mobil/tablet med 4-cifret personligt PIN-login og fuld **offline-first resiliens**.
+* **Touch-optimeret fremmøderegistrering (F3.1):** Lynhurtig batch-afkrydsning af et helt hold på under 15 sekunder på mobil/tablet med 6-cifret personligt PIN-login og fuld **offline-first resiliens**.
 * **Ledelsesdashboard (Malene):** Realtidsoverblik over kapacitetsudnyttelse, hesteflådens belastning, fraværsnotifikationer og interne ventelisteforslag ved afbud meldt inden kl. 12:00.
 * **1-Klik Tilsynsrapport til Strandby Kommune:** Automatiseret generering af revisionssikre dataudtræk over tilskudsberettiget fremmøde.
+
+### 💻 Teknologistak & Nøglekomponenter
+* **Frontend:** React 19, TypeScript, Vite, Tailwind CSS, Dexie.js (IndexedDB til Offline-First PWA).
+* **Backend:** Fastify, TypeScript, Prisma ORM, PostgreSQL 17 (med append-only DB triggere og SHA-256 revisionskæde).
+* **Tildelingsmotor / Solver:** Ren TypeScript Constraint Satisfaction solver (`packages/domain`) med MRV-heuristik, afviklet på <10 ms uden eksterne runtime-afhængigheder.
+* **Test & Kvalitetssikring:** Vitest, Playwright (E2E), Fast-Check (Property-based tests) og 100% statisk typekontrol på tværs af hele monorepoet.
 
 ---
 
@@ -102,6 +108,16 @@ I overensstemmelse med [`_resources/team/feature_prioritization.md`]:
 ## 📂 7. Repository Struktur & Nøgledokumenter
 
 ```text
+├── apps/                             # Applikationer
+│   ├── api/                          # Fastify + Prisma backend (REST API, SSE & audit-log)
+│   └── web/                          # React 19 + Vite frontend (Admin Dashboard & Offline Tablet PWA)
+├── packages/                         # Delte pakker
+│   ├── domain/                       # Ren forretningslogik & solver (MRV, Welfare Guard, afbudsregler)
+│   └── contracts/                    # Delte Zod-kontrakter & TypeScript DTO-typer
+├── tools/                            # Støtte- og demoværktøjer
+│   ├── bench/                        # Performance-benchmarks for kabalemotoren
+│   ├── demo/                         # Demoværktøjer (manipulationsbevis, virtuelt ur)
+│   └── seed/                         # Realistiske test- og demodata (fredag- og fuld månedsscenarie)
 ├── .specify/                         # Spec-Kit konfiguration & systemhukommelse
 │   ├── memory/constitution.md        # Forfatning, kardinalprincipper & hårde restriktioner (HC)
 │   ├── templates/                    # Skabeloner til specifikationer, planer og opgaver
@@ -109,8 +125,11 @@ I overensstemmelse med [`_resources/team/feature_prioritization.md`]:
 ├── specs/                            # Formelle specifikationer og designkrav
 │   └── 001-holdadministration-mvp/   # Aktiv MVP feature-specifikation
 │       ├── spec.md                   # Formel kravspecifikation (Stories, FR, Entiteter, SC)
+│       ├── tasks.md                  # Implementeringsopgaver
+│       ├── opgaver-backlog.md        # Detaljeret sprint-backlog med alle 20 gennemførte forbedringer
 │       └── checklists/
-│           └── requirements.md       # Verificeret kvalitets-tjekliste for krav
+│           ├── requirements.md       # Verificeret kvalitets-tjekliste for krav
+│           └── fase2-validering.md   # Valideringsrapport for fase 2
 ├── _resources/                       # Primære domænekilder og procesdokumentation
 │   ├── team/                         # Teamets konsoliderede domæneanalyse (SSoT)
 │   │   ├── feature_prioritization.md # Prioriteringsmatrix & faseopdeling (F1.1 - F3.1)
@@ -126,22 +145,22 @@ I overensstemmelse med [`_resources/team/feature_prioritization.md`]:
 
 ---
 
-## 🚀 8. Kom i gang (Komplet POC: Fase 1 & Fase 2)
+## 🚀 8. Kom i gang (Fuld MVP: Fase 1, 2 & 3)
 
-Systemet er nu en komplet fungerende Proof-of-Concept (POC), der omfatter:
-- **Staldflade (PWA) under `/stald`:** Touch-optimeret til tablets, 4-cifret PIN-login, batch-fremmøde offline på under 10 sekunder, lektionsvisning og akut top-3 hesteerstatning.
-- **Vikaradgang & Digitalt Cheat Sheet:** Hurtig vikar-adgang med 6-cifret engangskode uden kendskab til personfølsomme diagnoser (GDPR Art. 9).
-- **Web-Admin under `/admin`:** Den automatiske hestekabale (mrv-greedy@1), live Welfare Guard uden override, venteliste-genbesættelse ved afbud før kl. 12:00, kapacitets-heatmaps og 1-klik kommunale tilsynsrapporter med kryptografisk hashkædeverifikation.
+Systemet er en komplet fungerende MVP, der omfatter:
+- **Staldflade (PWA) under `/stald`:** Touch-optimeret til tablets, 6-cifret personligt PIN-login, batch-fremmøde offline på under 10 sekunder, lektionsvisning, statusmeldinger og akut top-3 hesteerstatning.
+- **Vikaradgang & Digitalt Cheat Sheet:** Hurtig vikar-adgang med 5-cifret engangskode uden kendskab til personfølsomme diagnoser (GDPR Art. 9).
+- **Web-Admin under `/admin`:** Den automatiske hestekabale (mrv-greedy@1), live Welfare Guard, kapacitetsudnyttelse (dags- og ugebasis), venteliste-genbesættelse ved afbud før kl. 12:00, og 1-klik kommunale tilsynsrapporter med kryptografisk hashkædeverifikation.
 
 **Forudsætninger**: Node.js 24 og Docker Desktop (PostgreSQL 17).
 
 ```bash
-npm install                                     # alle workspaces
-cp .env.example .env                            # udfyld nøgler og adgangskoder
+npm install                                     # installerer alle workspaces
+cp .env.example .env                            # udfyld nøgler og adgangskoder, guide i .env
 docker compose up -d db                         # PostgreSQL 17 (dev- og testdatabase)
 npm run db:migrate                              # Prisma-migrationer inkl. append-only-triggere
-npm run db:seed -- --scenarie=fredag --nulstil  # casens data inkl. PIN-koder og lektioner
-npm run dev                                     # API på :3000 og web på :5173
+npm run db:seed -- --scenarie=fuld --nulstil    # fylder databasen op med komplet månedsscenarie (eller --scenarie=fredag)
+npm run dev                                     # starter API på :3000 og web på :5173
 ```
 
 ### Adgang & Testbrugere
@@ -149,23 +168,23 @@ npm run dev                                     # API på :3000 og web på :5173
   - **Malene (Ledelse):** `malene@demo.dk` (adgangskode fra `SEED_ADGANGSKODE` i `.env`)
   - **Marie (Ridelærer):** `marie@demo.dk`
 - **Staldflade (`http://localhost:5173/stald`):**
-  - **PIN-login:** Malene: `111111`, Marie: `222222`, Camilla: `222333`, Birgit: `222444`, Staldelev (Ella J.): `333333`
-  - **Vikaradgang:** Vælg "Jeg er vikar" og brug en af de seedede 5-cifrede koder: `12345` (Sofie Fast vikar), `54321` eller `88899`.
+  - **Personale PIN-login (6 cifre):** Malene: `111111`, Marie: `222222`, Camilla: `222333`, Birgit: `222444`, Staldelev (Ella J.): `333333`
+  - **Vikaradgang (5 cifre):** Vælg "Jeg er vikar" og brug en af de seedede koder: `12345` (Sofie Fast vikar), `54321` eller `88899`.
 
-### Kørsel på tablet over lokalt netværk / HTTPS
-For at køre staldfladen på en fysisk iPad eller tablet på samme netværk:
-- Start webapplikationen med host-eksponering eller brug en lokal HTTPS-proxy (f.eks. Caddy eller `mkcert`), da PWA og Service Worker kræver sikker kontekst.
-- Åbn `https://<lokal-ip>:5173/stald` og tilføj til hjemmeskærmen for fuld PWA offline-oplevelse.
+> [!TIP]
+> **Kørsel på tablet over lokalt netværk / HTTPS:**  
+> For at åbne staldfladen på en fysisk iPad eller tablet på samme netværk, kan applikationen tilgås via lokal IP eller lokal HTTPS-proxy (f.eks. Caddy eller `mkcert`), da Service Worker og PWA offline-lagring kræver sikker kontekst. Åbn `https://<lokal-ip>:5173/stald` og vælg "Føj til hjemmeskærm" for fuld offline PWA-oplevelse.
 
 ### Automatiseret bevisførelse og demo-værktøjer
 ```bash
 npm test -w packages/domain       # 210 domænetests inkl. forfatningsscenarier F-01 – F-16
 npm run test:property             # fast-check invariant-test af Welfare Guard (200 inputs)
 npm run bench:kabale              # Månedskabale benchmark (180 ryttere / 29 hold / 22 heste): median 7,8 ms
+npm run test:e2e                  # Playwright E2E-tests af kritiske flows (vikar, stald, admin)
 npm run demo:tid                  # Virtuelt ur til simulering af kl. 12:00 afbudsfrist
 npm run demo:manipuler            # Beviser append-only trigger afvisning og audit-hashkædetjek
 npm run typecheck                 # 100% statisk typekontrol på tværs af hele monorepoet
 ```
 
-Opgaver og opgavestatus: [specs/001-holdadministration-mvp/tasks.md](specs/001-holdadministration-mvp/tasks.md).  
+Opgaver og opgavestatus: [specs/001-holdadministration-mvp/tasks.md](specs/001-holdadministration-mvp/tasks.md) og [specs/001-holdadministration-mvp/opgaver-backlog.md](specs/001-holdadministration-mvp/opgaver-backlog.md).  
 Valideringsrapport for Fase 2: [specs/001-holdadministration-mvp/checklists/fase2-validering.md](specs/001-holdadministration-mvp/checklists/fase2-validering.md).
